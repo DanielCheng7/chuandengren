@@ -54,10 +54,14 @@ const showFreeInput = computed(() => phase.value === 'input' && !!freeInputConfi
 const showBreak = computed(() => phase.value === 'break')
 
 const lanternState = computed<'half' | 'digital' | 'lit'>(() => {
-  if (e.state.lightingChoice || e.state.routeClue) return 'lit'
-  if (e.state.route) return 'digital'
+  // V3.0：序章～第三章为半成品态（工艺进行中）；C4 创新链后转数字态；
+  // 'lit'（点亮态）用于结局与尾声（结局页组件自持，步骤 35–38）。
+  if (e.state.route === 'B') return 'digital'
   return 'half'
 })
+
+/** 序章蒙太奇：可跳过不可快进（《开发文档》§6.3） */
+const isMontage = computed(() => e.node.value?.kind === 'montage')
 
 /** 场景谐调色：对话带 / 选项带随场景一并切换（写入 --tint，供组件消费；2026-10-16 用户决议） */
 const sceneTint = computed(() => getSceneTint(e.sceneKey.value))
@@ -215,6 +219,14 @@ function onKeydown(ev: KeyboardEvent) {
       ev.preventDefault()
       e.advance()
     }
+    return
+  }
+
+  // 审核工作流：Shift+D 开关调试面板（面板默认隐藏；调试/审核属非玩家 UI，演示前经「演示模式」一键隐藏）
+  if (ev.key === 'D' && ev.shiftKey && !ev.repeat) {
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return
+    settings.showDevPanel = !settings.showDevPanel
+    ev.preventDefault()
   }
 }
 
@@ -300,6 +312,16 @@ watch(phase, scheduleChoicesReady)
           <!-- 快捷操作区：固定在对白框右下角（UI 设计书 r3 §4.4）；
                自由输入阶段隐藏（2026-10-16 用户决议），过渡淡出防闪屏 -->
           <div class="quick-zone" :class="{ 'is-hidden': showFreeInput }" @click.stop>
+            <!-- 序章蒙太奇：可跳过（不可快进）——《开发文档》§6.3 -->
+            <button
+              v-if="isMontage"
+              class="tool touch-44 is-skip"
+              type="button"
+              title="跳过序章，直接进入第一章"
+              @click="e.skipMontage()"
+            >
+              跳过序章
+            </button>
             <button class="tool touch-44" type="button" @click="showHistory = true">回看</button>
             <button class="tool touch-44" type="button" @click="e.restart()">重新开始</button>
             <button class="tool touch-44" type="button" @click="showSettings = true">设置</button>
@@ -328,13 +350,13 @@ watch(phase, scheduleChoicesReady)
         </section>
 
         <section v-else-if="showBreak" class="break-panel anim-rise">
-          <h2>第二幕尚未接入</h2>
+          <h2>下一章尚未接入</h2>
           <p class="break-line">
-            下一节点 <code>{{ e.missingNodeId.value }}</code>（第二幕「问」）尚未接入。
+            下一节点 <code>{{ e.missingNodeId.value }}</code> 尚未接入（分章开发中）。
           </p>
           <p class="break-note">
-            按分幕开发流程，第一幕已交付人工审核；审核通过后开发第二幕，三条灯路与 `memory` /
-            `hasLetter` 门控会在那一幕集中验证。
+            按分章开发流程，序章 PRO ＋ 第一章 C1 已交付人工审核（卡点 ①，见《审核记录》）；
+            审核通过后接入第二章。调试面板（Shift+D）可跳转各章节入口核对断点。
           </p>
           <div class="break-actions">
             <button class="btn btn-inline" type="button" @click="e.restart()">从头再玩一遍</button>
@@ -628,6 +650,13 @@ watch(phase, scheduleChoicesReady)
 .tool:focus-visible {
   outline: 2px solid rgba(232, 163, 61, 0.6);
   outline-offset: 2px;
+}
+
+/* 跳过序章（蒙太奇期间出现；暖金强调，与常规快捷键区分） */
+.tool.is-skip {
+  color: var(--gold);
+  background: rgba(232, 163, 61, 0.1);
+  border-color: rgba(232, 163, 61, 0.38);
 }
 
 /* 触屏：放大视觉尺寸（配合 .touch-44 外扩热区） */

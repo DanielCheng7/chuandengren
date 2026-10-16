@@ -14,42 +14,21 @@ const e = props.engine
 
 const routeLabel = computed(() => {
   switch (e.state.route) {
-    case 'algorithm':
-      return '算法复原'
-    case 'memory':
-      return '记忆复原'
-    case 'community':
-      return '活人复原'
+    case 'A':
+      return '守旧链·《灯还亮着》'
+    case 'B':
+      return '创新链·《鱼入海》'
     default:
       return '未记录'
   }
 })
 
-const lightingLabel = computed(() => {
-  switch (e.state.lightingChoice) {
-    case 'solo':
-      return '独自点亮'
-    case 'father':
-      return '与父亲同点'
-    case 'public':
-      return '公开点灯'
-    default:
-      return '未记录'
-  }
-})
-
-const trustLabel = computed(() => {
-  if (e.state.aiTrust <= 0) return '低'
-  if (e.state.aiTrust >= 4) return '高'
-  return '中'
-})
-
-const report = computed(() => [
-  { k: '灯路', v: routeLabel.value },
-  { k: '点灯方式', v: lightingLabel.value },
-  { k: '与阿鲟', v: `${trustLabel.value}（${e.state.aiTrust}）` },
-  { k: '亲手参与', v: e.state.handMade ? '是' : '否' },
-])
+/**
+ * V3.0：全片不显示任何数值／评分／进度（《开发文档》§2.6）——结局页只呈现定性信息。
+ * 注：本页将在步骤 35–38（C4 ＋ 两条链＋结局）随数据一并重做（措辞微差 / 双高彩蛋 /
+ * 「体验另一条链」入口）；当前仅做 V3.0 口径对齐，保证编译与原则不违背。
+ */
+const report = computed(() => [{ k: '灯路', v: routeLabel.value }])
 </script>
 
 <template>

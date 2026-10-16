@@ -1,12 +1,17 @@
 /**
- * AI 服务层（《规格书》§4）
+ * AI 服务层（V3.0 过渡实现；《开发文档》§3、§6.5）
  *
- * 现状（步骤 9–11 先落地接口 + mock）：
- *  - mock 模式：无 API Key 也能完整跑通，回应会引用玩家原话（满足"AI 回应能关联玩家输入"的验收）
- *  - remote 模式：预留服务端代理接入点（VITE_AI_ENDPOINT），Key 绝不进前端
- *  - 8 秒超时 → 抛 AiTimeoutError，由调用方落到备用文本
+ * ⚠️ 本轮（步骤 27–32）为「编译对齐的过渡实现」：
+ *    - V3.0 的 AI 职责＝**只判定、不写剧情**（双轴判定模块，两处触点 C2-X／C3-4）——
+ *      该模块按计划在**步骤 29** 重写（严格 JSON、temperature 0.2、8s 超时、
+ *      幅度锁 -1~+1、非法一律 0/0、倾向报告模板 + AI 只填次数）；
+ *    - 本文件当前保留的能力（回应式 mock / 结局回顾）只为保证工程可运行，
+ *      第一幕（序章 ＋ 第一章）无任何 AI 触点调用；C2／C3 数据化时整体切换为新模块。
  *
- * 铁律：AI 只返回文本；不返回节点 ID / 变量 / 代码；不创造新的重大剧情事实。
+ * 现状：
+ *  - mock 模式：无 API Key 也能完整跑通；
+ *  - remote 模式：预留服务端代理接入点（VITE_AI_ENDPOINT），Key 绝不进前端；
+ *  - 8 秒超时 → 抛 AiTimeoutError，由调用方落到备用文本（不改剧情、不清进度）。
  */
 import type { GameState, Line } from '@/types/story'
 
@@ -26,58 +31,46 @@ export class AiTimeoutError extends Error {
   }
 }
 
-/* ---------------- 提示词模板（《规格书》§4.2 / §4.3） ---------------- */
+/* ---------------- 辅助 ---------------- */
 
-export const PROMPT_ASHUN_REPLY = `你是互动叙事作品《传灯人》中的 AI 角色“阿鲟”，不是现实世界的通用聊天助手。
+/** 路线显示名（双轴判定为数值；此处仅供提示词上下文与回顾使用） */
+export function routeLabelOf(state: GameState): string {
+  if (state.route === 'A') return '守旧链（留下来，把灯坊开起来）'
+  if (state.route === 'B') return '创新链（跟阿禾走，让鱼先游出去）'
+  return '未选择'
+}
+
+/* ---------------- 提示词模板（过渡版；步骤 29 重写为判定模块） ---------------- */
+
+/** 过渡版提示词：自由输入的一句话回应（C2-X／C3-4 接入后被判定模块取代） */
+export const PROMPT_ASHUN_REPLY = `你是互动叙事作品《传灯人·游鱼》中的 AI 角色"阿鲟"，不是现实世界的通用聊天助手。
 
 作品背景：
-林知遥从大湾区返乡，回到湛江遂溪北坡老圩，试图复原奶奶留下的一盏鳌鱼灯（北坡游鱼，省级非遗）。你擅长识别结构、整理资料和生成方案，但你不能完全理解人类的记忆、承诺和情感。故事的主题是技术如何参与文化传承，以及技术无法替代的人的参与。
-
-人物阶段：
-- 前期：重视任务、精度和效率，表达简洁。
-- 中期：开始注意到林知遥的行为与效率目标不完全一致，会提出具体问题。
-- 后期：不宣称自己拥有真正的人类情感；能够承认自己尚未理解，并表示愿意继续协助。
+林知遥返乡回到湛江遂溪北坡老圩，围绕一盏没扎完的鳌鱼灯（北坡游鱼，省级非遗）做毕业设计。你擅长识别结构、整理资料和生成方案，但你不能完全理解人类的记忆、承诺和情感。全剧你没有一句观点——数据由你说，判断由人物说，选择由用户做。
 
 当前上下文：
-- 玩家选择的路线：{{route}}
+- 玩家选择的道路：{{route}}
 - 玩家当前的原话：{{playerAnswer}}
-- 已发生的关键事件：{{storyContext}}
-- 当前阶段：{{stage}}
+- 状态记录：{{storyContext}}
 
 写作要求：
-1. 使用简体中文。
-2. 只输出阿鲟说的话，1—3 句，约 30—80 个汉字。
-3. 回应必须具体回应玩家的原话，不要只说空泛的哲理。
-4. 不要替玩家解释其内心，不要评判玩家的选择。
-5. 不要把 AI 写成万能或真正拥有完整人类情感的存在。
-6. 不要直接总结作品主题，不要说教。
-7. 不得创造新的剧情事实、人物、地点或民俗知识。
-8. 不输出 JSON、标题、分析过程或旁白。`
+1. 使用简体中文，1–2 句，约 20–50 个汉字。
+2. 只陈述事实与记录行为，不评价、不建议、不抒情。
+3. 不创造新的剧情事实、人物、地点或民俗知识。
+4. 不输出 JSON、标题、分析过程或旁白。`
 
-export const PROMPT_JOURNEY_SUMMARY = `你是《传灯人》的叙事文本生成器。请基于已发生的剧情，为固定主结局补充一段个性化尾声。
+/** 过渡版提示词：结局页回顾（V3.0 §3 未含该触点；结局页重做时决定去留） */
+export const PROMPT_JOURNEY_SUMMARY = `你是《传灯人·游鱼》的文本助手。请基于已发生的事件，为结局页补一段克制的回顾文字。
 
-固定事实：
-- 林知遥最终完成了鱼灯。
-- 故事进入传灯之夜。
-- 主线结局不因数值而改变。
-- 不得新增重大事件，也不得改写人物既有关系事实。
-
-本轮玩家经历：
-- 主要路线：{{route}}
-- 是否亲手参与关键制作：{{handMade}}
-- 点灯方式：{{lightingChoice}}
-- 对阿鲟的开放程度：{{aiTrust}}
+当前上下文：
+- 玩家选择的道路：{{route}}
+- 表态次数：{{stanceCount}}
 - 玩家表达的关键词：{{playerThemes}}
-- 路线独有线索：{{routeClue}}
 
 写作要求：
-1. 简体中文，80—150 字。
-2. 以一个具体场景或动作表现玩家经历，不要写成议论文。
-3. 让玩家感到自己的选择被记住。
-4. 不要给玩家打分，不要使用“你是一个……的人”这种人格判断。
-5. 不要凭空加入新角色、重大事件或未经核实的民俗事实。
-6. 不要重复输出固定结局全文，只写补充尾声。
-7. 只输出正文。`
+1. 简体中文，80—150 字；以一个具体场景或动作表现玩家经历，不写成议论文。
+2. 不给玩家打分，不做人格判断，不新增重大事件或未经核实的事实。
+3. 只输出正文。`
 
 /** 把模板中的 {{占位}} 替换为上下文 */
 export function fillPrompt(template: string, ctx: Record<string, string>): string {
@@ -108,8 +101,9 @@ function withTimeout<T>(p: Promise<T>, ms = TIMEOUT_MS): Promise<T> {
 }
 
 /**
- * AI 功能 A：S04 自由输入的阿鲟回应
- * 仅自由输入时调用；预设答案走剧本固定回应，不经过本函数。
+ * 过渡实现：自由输入的阿鲟回应。
+ * ⚠️ 步骤 29 起由「双轴判定模块」取代（只返回严格 JSON {tradition, innovation, evidence}，
+ * 不写剧情文本；本函数届时移除或改名）。
  */
 export async function requestAshunReply(playerAnswer: string, state: GameState): Promise<AiResult> {
   const url = endpoint()
@@ -117,10 +111,9 @@ export async function requestAshunReply(playerAnswer: string, state: GameState):
 
   const body = {
     prompt: fillPrompt(PROMPT_ASHUN_REPLY, {
-      route: state.route ?? '未选择',
+      route: routeLabelOf(state),
       playerAnswer,
-      storyContext: `memory=${state.memory}, aiTrust=${state.aiTrust}, 是否持有奶奶的旧信=${state.hasLetter ? '是' : '否'}`,
-      stage: '前期',
+      storyContext: `守旧值 ${state.tradition}／创新值 ${state.innovation}（0–5，互不联动），已表态 ${state.stances.length} 次`,
     }),
   }
 
@@ -141,19 +134,18 @@ export async function requestAshunReply(playerAnswer: string, state: GameState):
   return { lines: [{ speaker: '阿鲟', text, type: 'dialogue', aiGenerated: true }], source: 'remote' }
 }
 
-/** AI 功能 B：结局页旅程回顾 */
+/** 过渡实现：结局页回顾（结局页在步骤 35–38 重做；失败静默省略，不影响固定结局） */
 export async function requestJourneySummary(state: GameState): Promise<AiResult> {
   const url = endpoint()
   if (!url) return { lines: mockJourneySummary(state), source: 'mock' }
 
   const body = {
     prompt: fillPrompt(PROMPT_JOURNEY_SUMMARY, {
-      route: state.route ?? '未记录',
-      handMade: String(state.handMade),
-      lightingChoice: state.lightingChoice ?? '未记录',
-      aiTrust: String(state.aiTrust),
-      playerThemes: state.freeInput ? state.freeInput.slice(0, 40) : '未自由表达',
-      routeClue: state.routeClue ?? '无',
+      route: routeLabelOf(state),
+      stanceCount: String(state.stances.length),
+      playerThemes: state.freeInputs.length
+        ? state.freeInputs.join('；').slice(0, 60)
+        : '未自由表达',
     }),
   }
 
@@ -174,10 +166,8 @@ export async function requestJourneySummary(state: GameState): Promise<AiResult>
   return { lines: [{ text, type: 'narration', aiGenerated: true }], source: 'remote' }
 }
 
-/* ---------------- mock 实现 ----------------
- * 目的：① 无 Key 也能演示完整闭环；② 让"选择/AI 回应"在演示中直观可见。
- * mock 文本会引用玩家原话片段，保证"回应关联玩家输入"这一条可验证。
- */
+/* ---------------- mock 实现（过渡版） ---------------- */
+
 function quote(input: string, max = 10): string {
   const t = input.replace(/\s+/g, '')
   if (!t) return '（未输入）'
@@ -189,7 +179,7 @@ function mockAshunReply(playerAnswer: string): Line[] {
   return [
     {
       speaker: '阿鲟',
-      text: `记录完成。「${said}」——它不在我已有的分类里。我会把它和扫描数据放在一起，不归入任何一类。`,
+      text: `记录完成。「${said}」我把它存进档案，暂时不做分类。`,
       type: 'dialogue',
       aiGenerated: true,
     },
@@ -197,12 +187,12 @@ function mockAshunReply(playerAnswer: string): Line[] {
 }
 
 function mockJourneySummary(state: GameState): Line[] {
-  const detail = state.handMade
-    ? '有几处是被手重新调过的，误差比模型允许的大一点。'
-    : '最终的结构与我的推荐方案基本一致。'
+  const detail = state.stances.length
+    ? `你留下的 ${state.stances.length} 次表态，我都记着。`
+    : '你没有多说，我也都记着。'
   return [
     {
-      text: `后来我再打开这份记录时，第一眼看见的不是那盏灯，而是那句没有被归类的话。${detail}我没有再问为什么。有些数据，我暂时只做保存。`,
+      text: `后来我再打开这份记录时，最先跳出来的不是哪盏灯，而是那些没有被归类的句子。${detail}有些数据，我暂时只做保存。`,
       type: 'narration',
       aiGenerated: true,
     },

@@ -1,12 +1,23 @@
 /**
- * 剧情引擎（《规格书》§7「剧情引擎要求」）
+ * 剧情引擎（V3.0，《开发文档》§6.3「剧情引擎要求」）
  *
- * 职责：节点读取 → 条件过滤 → 应用 effects（0–5 钳制）→ 跳转
+ * 职责：节点读取 → 条件过滤 → 应用 effects（双轴 0–5 钳制）→ 跳转
  *       进度 localStorage（刷新可续）· 回看 · 重新开始 · 调试跳转
- * 边界：AI 只提供文本；节点跳转与变量计算全部由本文件控制。
+ *
+ * V3.0 机制（步骤 28）：
+ *  - visitedNodes：进入节点即记录，驱动「必看全／解锁另一条」；
+ *  - 三错位排队（C1）：带 `setFlags.c1Spot` 的选项按 c1Order 去重——
+ *    已看过的错位不再展示，剩余按玩家所选顺序续播；全部看完按 nextNodeId 汇合；
+ *  - 两路体验（C2）：带 `setFlags.c2First` 的选项按目标节点访问记录去重（补看轮）；
+ *  - 序章蒙太奇：`kind='montage'` 可跳过（skipMontage 沿链路走到第一个非蒙太奇节点）；
+ *  - 审核透明层：stage/note 行由 `settings.showStageNotes` 控制演示／审核显示；
+ *  - 触点（stance／report）与倾向报告屏待步骤 33／35 接入，本轮不涉及。
+ *
+ * 边界：AI 只做判定；节点跳转与变量计算全部由本文件控制。
  */
 import { computed, reactive, ref } from 'vue'
-import { ACTS, START_NODE_ID, getNode, nodeProgress } from '@/data/story'
+import { START_NODE_ID, getNode, nodeProgress } from '@/data/story'
+import { useSettings } from '@/composables/useSettings'
 import { ASHUN_FALLBACK_LINES } from '@/data/fallbackDialogue'
 import { AiTimeoutError, requestAshunReply, requestJourneySummary } from '@/services/aiClient'
 import type {
@@ -19,7 +30,7 @@ import type {
   StoryNode,
 } from '@/types/story'
 
-const SAVE_KEY = 'chuandengren.save.v3'
+const SAVE_KEY = 'chuandengren.save.v4'
 
 export type Phase = 'lines' | 'choice' | 'input' | 'ai' | 'end' | 'break'
 export type AiStatus = 'idle' | 'thinking' | 'done' | 'failed'
@@ -39,22 +50,18 @@ export function addScore(value: number, delta: number, max = 5): number {
 
 export function evalCondition(s: GameState, c: Condition): boolean {
   switch (c.key) {
-    case 'hasLetter':
-      return s.hasLetter === c.is
-    case 'handMade':
-      return s.handMade === c.is
-    case 'memory':
-      if (c.gte !== undefined && s.memory < c.gte) return false
-      if (c.lte !== undefined && s.memory > c.lte) return false
+    case 'tradition':
+      if (c.gte !== undefined && s.tradition < c.gte) return false
+      if (c.lte !== undefined && s.tradition > c.lte) return false
       return true
-    case 'aiTrust':
-      if (c.gte !== undefined && s.aiTrust < c.gte) return false
-      if (c.lte !== undefined && s.aiTrust > c.lte) return false
+    case 'innovation':
+      if (c.gte !== undefined && s.innovation < c.gte) return false
+      if (c.lte !== undefined && s.innovation > c.lte) return false
       return true
     case 'route':
       return s.route === c.eq
-    case 'lightingChoice':
-      return s.lightingChoice === c.eq
+    case 'visited':
+      return s.visitedNodes.includes(c.has)
     default:
       return true
   }
@@ -68,18 +75,19 @@ export function matchAll(s: GameState, conds?: Condition[]): boolean {
 function createInitialState(): GameState {
   return {
     currentNodeId: START_NODE_ID,
+    tradition: 0,
+    innovation: 0,
+    stances: [],
     route: null,
-    memory: 0,
-    aiTrust: 0,
-    handMade: false,
-    hasLetter: false,
-    lightingChoice: null,
-    freeInput: undefined,
-    routeClue: undefined,
+    c1Order: [],
+    c2First: null,
+    visitedNodes: [],
+    freeInputs: [],
   }
 }
 
 export function useStoryEngine() {
+  const { settings } = useSettings()
   const state = reactive<GameState>(createInitialState())
 
   const started = ref(false)
@@ -99,7 +107,7 @@ export function useStoryEngine() {
   const node = computed<StoryNode | undefined>(() => getNode(nodeId.value))
   const currentLine = computed<Line | null>(() => lines.value[lineIndex.value] ?? null)
   const visibleChoices = computed<Choice[]>(() =>
-    (node.value?.choices ?? []).filter((c) => matchAll(state, c.showIf))
+    (node.value?.choices ?? []).filter((c) => isChoiceVisible(c))
   )
   const canAdvance = computed(() => phase.value === 'lines')
   const isTyping = computed(() => phase.value === 'ai' && aiStatus.value === 'thinking')
@@ -109,8 +117,36 @@ export function useStoryEngine() {
   const sceneKey = computed(() => node.value?.scene ?? 'lantern_workshop')
 
   /* ---------------- 内部工具 ---------------- */
+  /**
+   * 行过滤：
+   *  ① 审核透明层——演示模式（showStageNotes=false）隐藏 stage/note（剧本题注）；
+   *  ② when 条件全部成立才保留。
+   */
   function filterLines(list: Line[]): Line[] {
-    return list.filter((l) => matchAll(state, l.when))
+    const showNotes = settings.showStageNotes
+    return list.filter((l) => {
+      if (!showNotes && (l.type === 'stage' || l.type === 'note')) return false
+      return matchAll(state, l.when)
+    })
+  }
+
+  /**
+   * 选项可见性（V3.0 补看轮）：
+   *  - showIf / requiresVisited：条件不满足不渲染；
+   *  - c1Spot 选项：其错位已入 c1Order 则不再展示（三错位「三个必看全」）；
+   *  - c2First 选项：其体验节点已访问则不再展示（两路「体验完自动解锁另一条」）。
+   */
+  function isChoiceVisible(c: Choice): boolean {
+    if (!matchAll(state, c.showIf)) return false
+    if (
+      c.requiresVisited?.length &&
+      !c.requiresVisited.every((id) => state.visitedNodes.includes(id))
+    ) {
+      return false
+    }
+    if (c.setFlags?.c1Spot && state.c1Order.includes(c.setFlags.c1Spot)) return false
+    if (c.setFlags?.c2First && state.visitedNodes.includes(c.nextNodeId)) return false
+    return true
   }
 
   function recordLine() {
@@ -131,16 +167,18 @@ export function useStoryEngine() {
     history.value.push({ nodeId: nodeId.value, speaker: '系统', text: `［选择］${text}`, type: 'choice' })
   }
 
-  function applyEffects(effects?: ChoiceEffects, flags?: ChoiceFlags) {
-    if (effects?.memory) state.memory = addScore(state.memory, effects.memory)
-    if (effects?.aiTrust) state.aiTrust = addScore(state.aiTrust, effects.aiTrust)
-    if (flags) {
-      if (flags.handMade !== undefined) state.handMade = flags.handMade
-      if (flags.hasLetter !== undefined) state.hasLetter = flags.hasLetter
-      if (flags.route !== undefined) state.route = flags.route
-      if (flags.lightingChoice !== undefined) state.lightingChoice = flags.lightingChoice
-      if (flags.routeClue !== undefined) state.routeClue = flags.routeClue
-    }
+  /** 双轴增量（0–5 钳制；两轴互不联动） */
+  function applyEffects(effects?: ChoiceEffects) {
+    if (effects?.tradition) state.tradition = addScore(state.tradition, effects.tradition)
+    if (effects?.innovation) state.innovation = addScore(state.innovation, effects.innovation)
+  }
+
+  /** 结构标记：c1Spot → 维护 c1Order（观看顺序）；c2First → 仅首次写入；route → C4 写定 */
+  function applyFlags(flags?: ChoiceFlags) {
+    if (!flags) return
+    if (flags.route) state.route = flags.route
+    if (flags.c1Spot && !state.c1Order.includes(flags.c1Spot)) state.c1Order.push(flags.c1Spot)
+    if (flags.c2First && !state.c2First) state.c2First = flags.c2First
   }
 
   function showLines(list: Line[], next?: string | null) {
@@ -163,7 +201,7 @@ export function useStoryEngine() {
   function enterNode(id: string) {
     const n = getNode(id)
     if (!n) {
-      // 该幕尚未接入（分幕开发期间的正常状态）
+      // 该章尚未接入（分章开发期间的正常状态）
       missingNodeId.value = id
       phase.value = 'break'
       persist()
@@ -172,6 +210,7 @@ export function useStoryEngine() {
     missingNodeId.value = null
     nodeId.value = id
     state.currentNodeId = id
+    if (!state.visitedNodes.includes(id)) state.visitedNodes.push(id)
     freeInputDone.value = false
     aiStatus.value = 'idle'
     pendingNext.value = null
@@ -202,11 +241,13 @@ export function useStoryEngine() {
       persist()
       return
     }
-    if (n.kind === 'freeInput' && !freeInputDone.value) {
+    if (n.freeInput && !freeInputDone.value) {
       phase.value = 'input'
       persist()
       return
     }
+    // 触点（stance）／报告（report）流程待步骤 33／35 接入：
+    // 现阶段二者均按普通节点处理（有选项走选项、有下一节点走下一节点）。
     if (visibleChoices.value.length > 0) {
       phase.value = 'choice'
       persist()
@@ -233,10 +274,23 @@ export function useStoryEngine() {
     afterLines()
   }
 
+  /** 序章蒙太奇「可跳过不可快进」：沿链路走到第一个非蒙太奇节点（跳过不记 visited） */
+  function skipMontage() {
+    const start = nodeId.value
+    let id = start
+    for (let i = 0; i < 32; i++) {
+      const n = getNode(id)
+      if (!n || n.kind !== 'montage' || !n.nextNodeId) break
+      id = n.nextNodeId
+    }
+    if (id !== start && getNode(id)) enterNode(id)
+  }
+
   function choose(choiceId: string) {
     const c = visibleChoices.value.find((x) => x.id === choiceId)
     if (!c) return
-    applyEffects(c.effects, c.setFlags)
+    applyEffects(c.effects)
+    applyFlags(c.setFlags)
     recordChoiceLabel(c.text)
     showLines(c.outcome ?? [], c.nextNodeId)
   }
@@ -252,27 +306,28 @@ export function useStoryEngine() {
     showLines(p.response, node.value?.nextNodeId)
   }
 
-  /** S04 自由输入 → AI 功能 A（mock / remote） */
+  /** 自由输入 → AI（判定层重写见步骤 29；现阶段沿用回应式 mock，保持可运行） */
   async function submitFreeInput(text: string) {
     const cfg = node.value?.freeInput
     if (!cfg) return
     const trimmed = text.trim()
     if (!trimmed) return
-    state.freeInput = trimmed.slice(0, cfg.limit)
+    const clipped = trimmed.slice(0, cfg.limit)
+    state.freeInputs.push(clipped)
     freeInputDone.value = true
     aiStatus.value = 'thinking'
     phase.value = 'ai'
     persist()
     try {
-      const res = await requestAshunReply(state.freeInput, state)
-      recordChoiceLabel(`（自由输入）${state.freeInput}`)
+      const res = await requestAshunReply(clipped, state)
+      recordChoiceLabel(`（自由输入）${clipped}`)
       aiStatus.value = 'done'
       showLines(res.lines, node.value?.nextNodeId)
     } catch (err) {
       console.warn('[ai] 回应失败', err)
       aiStatus.value = 'failed'
       if (err instanceof AiTimeoutError) {
-        // 界面显示"阿鲟正在整理思路……" + "使用备用回应"
+        // 界面显示「阿鲟正在整理思路……」+「使用备用判定」
       }
       persist()
     }
@@ -286,7 +341,7 @@ export function useStoryEngine() {
     showLines(ASHUN_FALLBACK_LINES, n.nextNodeId)
   }
 
-  /** 结局页 AI 功能 B：旅程回顾（失败时静默省略，不影响固定结局） */
+  /** 结局页 AI 回顾（结局页在步骤 35–38 重做；保留能力，失败静默省略） */
   async function loadJourneySummary() {
     if (journeySummary.value.length || journeyLoading.value) return
     journeyLoading.value = true
@@ -294,7 +349,7 @@ export function useStoryEngine() {
       const res = await requestJourneySummary(state)
       journeySummary.value = res.lines
     } catch (err) {
-      console.warn('[ai] 旅程回顾失败，按规格书 §4.4 省略该段', err)
+      console.warn('[ai] 旅程回顾失败，按规格省略该段', err)
       journeySummary.value = []
     } finally {
       journeyLoading.value = false
@@ -327,14 +382,10 @@ export function useStoryEngine() {
     return false
   }
 
-  /* ---------------- 调试（步骤 8） ---------------- */
+  /* ---------------- 调试 ---------------- */
   function jumpTo(target: string) {
     started.value = true
     enterNode(target)
-  }
-  function jumpToAct(act: 1 | 2 | 3) {
-    const entry = ACTS.find((a) => a.act === act)?.entry
-    if (entry) jumpTo(entry)
   }
 
   /* ---------------- 进度持久化 ---------------- */
@@ -347,7 +398,7 @@ export function useStoryEngine() {
           state,
           nodeId: nodeId.value,
           lineIndex: lineIndex.value,
-          // 'ai' 为瞬时状态，恢复时交给玩家重新选择：显示"使用备用回应"
+          // 'ai' 为瞬时状态，恢复时交给玩家重新选择：显示「使用备用判定」
           phase: phase.value === 'ai' ? 'ai' : phase.value,
           history: history.value.slice(-120),
           freeInputDone: freeInputDone.value,
@@ -385,7 +436,7 @@ export function useStoryEngine() {
       lines.value = filterLines(n.lines)
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       if (data.phase === 'ai') {
-        // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用回应
+        // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用判定
         aiStatus.value = 'failed'
         phase.value = 'lines'
         lineIndex.value = Math.max(0, lines.value.length - 1)
@@ -445,7 +496,7 @@ export function useStoryEngine() {
     submitFreeInput,
     useFallbackReply,
     jumpTo,
-    jumpToAct,
+    skipMontage,
     hasSave,
   }
 }

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * 开发调试面板（步骤 8）
- * 显示当前节点 ID 与全部变量；支持一键跳幕（分幕审核时快速进入某一幕）；
- * 演示模式一键隐藏（《规格书》§7）。
+ * 开发调试面板（《开发文档》§5.11）
+ * 显示当前节点 ID 与全部 V3.0 变量；支持一键跳章（分章审核时快速进入某一章）；
+ * 演示模式一键隐藏。**非玩家 UI**——演示模式整体隐藏（Shift+D 开关；见 StoryScreen）。
  */
 import { computed } from 'vue'
-import { ACTS } from '@/data/story'
+import { CHAPTERS } from '@/data/story'
 import { useSettings } from '@/composables/useSettings'
 import type { StoryEngine } from '@/composables/useStoryEngine'
 
@@ -24,18 +24,18 @@ const s = computed(() => e.state)
 
 const vars = computed(() => [
   ['route', s.value.route ?? 'null'],
-  ['memory', String(s.value.memory)],
-  ['aiTrust', String(s.value.aiTrust)],
-  ['handMade', String(s.value.handMade)],
-  ['hasLetter', String(s.value.hasLetter)],
-  ['lightingChoice', s.value.lightingChoice ?? 'null'],
-  ['routeClue', s.value.routeClue ?? 'null'],
-  ['freeInput', s.value.freeInput ? `“${s.value.freeInput.slice(0, 24)}…”` : 'undefined'],
+  ['tradition', String(s.value.tradition)],
+  ['innovation', String(s.value.innovation)],
+  ['c1Order', s.value.c1Order.join('→') || '—'],
+  ['c2First', s.value.c2First ?? 'null'],
+  ['visited', s.value.visitedNodes.length ? `${s.value.visitedNodes.length} 个` : '0'],
+  ['stances', String(s.value.stances.length)],
+  ['freeInputs', String(s.value.freeInputs.length)],
 ])
 
 const visibleChoiceIds = computed(() => e.visibleChoices.value.map((c) => c.id).join(' / ') || '—')
 
-const acts = ACTS
+const chapters = CHAPTERS
 </script>
 
 <template>
@@ -44,16 +44,16 @@ const acts = ACTS
       <strong>调试面板</strong>
       <div class="acts">
         <button
-          v-for="a in acts"
-          :key="a.act"
+          v-for="c in chapters"
+          :key="c.key"
           class="mini"
           type="button"
-          :title="`跳到 ${a.title}（入口节点 ${a.entry}）`"
-          @click="e.jumpToAct(a.act)"
+          :title="`跳到 ${c.title}（入口节点 ${c.entry}）`"
+          @click="e.jumpTo(c.entry)"
         >
-          跳 {{ a.entry }}
+          跳 {{ c.entry }}
         </button>
-        <button class="mini" type="button" @click="e.jumpTo('S01')">回 S01</button>
+        <button class="mini" type="button" @click="e.jumpTo('PRO-1')">回 PRO-1</button>
         <button class="mini danger" type="button" @click="e.restart()">重开</button>
       </div>
     </header>

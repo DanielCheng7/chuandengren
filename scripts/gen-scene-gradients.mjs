@@ -1,9 +1,11 @@
 /**
- * 生成场景渐变图 grad_<key>.svg（每个场景一张独立渐变图，UI 设计书 r3 §6）
+ * 生成场景渐变图 grad_<key>.svg（每个场景一张独立渐变图）
  *
  * 用法：npm run gen:scenes（或 node scripts/gen-scene-gradients.mjs）
  * 说明：
- *   - 色值与 src/data/scenes.ts 的 SCENES 一一对应（改色时两处同步）；
+ *   - 色值与 src/data/scenes.ts 的 SCENES 一一对应（13 个在用 key，改色时两处同步）；
+ *   - V3.0（步骤 30）：新增 museum_case／gift_shop／night_stall／studio_night／city_facade 五张；
+ *     home_door／flashback 停用（旧图保留在磁盘作留档，不再重新生成）；
  *   - 生成文件放在 public/assets/scenes/，可随时用设计稿同覆盖替换，代码零改动；
  *   - 合成规则与 SceneLayer.vue 的 CSS 回落一致：底部纵向渐变 + 圆形光源。
  */
@@ -18,13 +20,16 @@ const SCENES = {
   train: { base: ['#1E314B', '#31486A'], glow: '#8FB4D6', glowPos: [70, 30], glowStrength: 0.42 },
   laoxu_street: { base: ['#3A2A22', '#604632'], glow: '#E8A33D', glowPos: [80, 22], glowStrength: 0.62 },
   lantern_workshop: { base: ['#2B2119', '#503B29'], glow: '#FFB65C', glowPos: [50, 18], glowStrength: 0.58 },
-  home_door: { base: ['#1D2B40', '#2F425F'], glow: '#E8A33D', glowPos: [42, 55], glowStrength: 0.48 },
+  museum_case: { base: ['#232C3E', '#3E4A61'], glow: '#D8E2EE', glowPos: [50, 26], glowStrength: 0.44 },
+  gift_shop: { base: ['#3E3446', '#6A5666'], glow: '#F2D8AE', glowPos: [52, 20], glowStrength: 0.6 },
+  night_stall: { base: ['#1F2C44', '#34405E'], glow: '#E6EFFA', glowPos: [50, 30], glowStrength: 0.5 },
   jiupo_courtyard: { base: ['#3B382C', '#605A46'], glow: '#F5EFE2', glowPos: [65, 12], glowStrength: 0.55 },
+  studio_night: { base: ['#1B2740', '#2C3A5C'], glow: '#9CC8E0', glowPos: [62, 28], glowStrength: 0.5 },
   banyan_night: { base: ['#1A2A46', '#26395C'], glow: '#FFB65C', glowPos: [50, 40], glowStrength: 0.85 },
   fish_parade: { base: ['#1C2A45', '#2C4266'], glow: '#FFD79A', glowPos: [50, 64], glowStrength: 0.8 },
-  dry_field: { base: ['#4A3628', '#805C3A'], glow: '#FFB65C', glowPos: [84, 30], glowStrength: 0.55 },
-  flashback: { base: ['#3B3444', '#6C5C52'], glow: '#FFD9A0', glowPos: [46, 62], glowStrength: 0.62 },
   workshop_next_year: { base: ['#453A2B', '#705A3E'], glow: '#FFD79A', glowPos: [62, 20], glowStrength: 0.62 },
+  city_facade: { base: ['#131F36', '#25355A'], glow: '#FFD79A', glowPos: [50, 44], glowStrength: 0.72 },
+  dry_field: { base: ['#4A3628', '#805C3A'], glow: '#FFB65C', glowPos: [84, 30], glowStrength: 0.55 },
 }
 
 const W = 1600

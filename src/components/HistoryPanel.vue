@@ -4,15 +4,16 @@
  *  - **整屏半透明覆盖**：场景隐约可见（打开时底层叙事已整体淡出，见 StoryScreen .overlay-open）；
  *    膜色随场景谐调色（--tint）；
  *  - **左上大标题**：中文大字「回看」+ 英文小字「HISTORY」；
- *  - **按幕分组的记录流**（2026-10-16 用户决议）：同幕记录只在组首标一次
- *    「第一幕「归」」式标题（由 ACTS 入口节点自动分组），**不再逐行标节点号**；
+ *  - **按章分组的记录流**（V3.0）：同章记录只在组首标一次
+ *    「第一章·灯往何处去」式标题（**取节点数据的 `chapter` 字段**，V3.0 章序、自动分组），
+ *    组内不逐行标节点号；
  *    行＝【名字（语气色，与对话框一致）】+ 文本同行排列，台词带「」、旁白缩进；
  *  - **美化滚动条**（浅轨 + 纸白滑块）；**右下「返回」胶囊**（参考图 Back）。
  * 关闭方式仍三条：返回按钮 + 点击遮罩 + Esc（UI 设计书 §4.9）。
  */
 import { computed, onMounted, onUnmounted } from 'vue'
 import type { HistoryEntry } from '@/composables/useStoryEngine'
-import { ACTS } from '@/data/story'
+import { getNode } from '@/data/story'
 import { speakerTone } from '@/utils/speakerTone'
 
 const props = defineProps<{ entries: HistoryEntry[] }>()
@@ -38,14 +39,9 @@ function displayText(h: HistoryEntry): string {
   return h.text
 }
 
-/** 节点 → 所属幕标题（按 ACTS 的入口节点自动分组：S01–S04 第一幕……） */
-function actTitleOf(nodeId: string): string {
-  const n = Number(nodeId.replace(/^S/, '')) || 0
-  let title = ACTS[0]?.title ?? ''
-  for (const a of ACTS) {
-    if (n >= Number(a.entry.replace(/^S/, ''))) title = a.title
-  }
-  return title
+/** 节点 → 所属章标题（V3.0：取节点数据的 `chapter` 字段，如「第一章·灯往何处去」） */
+function chapterOf(nodeId: string): string {
+  return getNode(nodeId)?.chapter ?? ''
 }
 
 interface Row {
@@ -59,15 +55,15 @@ interface Row {
   ai: boolean
 }
 
-/** 记录流 → 渲染行（幕首插入分组标题；行级不再标节点号） */
+/** 记录流 → 渲染行（章首插入分组标题；行级不再标节点号） */
 const rows = computed<Row[]>(() => {
   const out: Row[] = []
-  let lastAct = ''
+  let lastGroup = ''
   props.entries.forEach((h, i) => {
-    const act = actTitleOf(h.nodeId)
-    if (act !== lastAct) {
-      lastAct = act
-      out.push({ key: `h${i}`, head: act, who: null, text: null, tone: '', cls: '', ai: false })
+    const group = chapterOf(h.nodeId) || lastGroup || '其他'
+    if (group !== lastGroup) {
+      lastGroup = group
+      out.push({ key: `h${i}`, head: group, who: null, text: null, tone: '', cls: '', ai: false })
     }
     out.push({
       key: `l${i}`,
@@ -181,7 +177,7 @@ const rows = computed<Row[]>(() => {
   border-radius: 6px;
 }
 
-/* 幕分组标题：「第一幕「归」」+ 右延细线（章节扉页感） */
+/* 章分组标题：「第一章·灯往何处去」+ 右延细线（章节扉页感） */
 .group {
   display: flex;
   align-items: center;
