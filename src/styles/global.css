@@ -1,0 +1,386 @@
+/* ============================================================
+   《传灯人》全局样式 · 设计基调：水墨暮色 × 暖灯色
+   色板锁定（制作计划 §0.3）；2026-10-16 决议：基调由「深夜」提亮为「暮色」
+   —— 暖色不变，墨色系整体提亮；色值以本文件 :root 为准（UI 设计书 r2）
+   ============================================================ */
+
+:root {
+  /* 主色板（暮色版） */
+  --ink: #24365a; /* 暮蓝（原墨蓝 #101b2c 提亮） */
+  --gold: #e8a33d; /* 暖金 */
+  --candle: #ffb65c; /* 烛光橙 */
+  --bamboo: #6e8b7a; /* 竹青 */
+  --paper: #f5efe2; /* 纱纸白 */
+  --seal: #8c3b2e; /* 暗红 */
+
+  /* 派生 */
+  --ink-deep: #1a2740;
+  --ink-soft: rgba(36, 54, 90, 0.66);
+  --panel: rgba(38, 58, 96, 0.46);
+  --panel-solid: rgba(34, 52, 86, 0.86);
+  --hairline: rgba(232, 163, 61, 0.28);
+  --hairline-soft: rgba(245, 239, 226, 0.16);
+  --text: rgba(245, 239, 226, 0.96);
+  --text-dim: rgba(245, 239, 226, 0.72);
+  --text-faint: rgba(245, 239, 226, 0.5);
+
+  /* 毛玻璃（对白框与面板统一；UI 设计书 r2 §3） */
+  --glass-bg: linear-gradient(165deg, rgba(66, 94, 146, 0.34) 0%, rgba(36, 54, 90, 0.5) 100%);
+  --glass-bg-soft: linear-gradient(165deg, rgba(66, 94, 146, 0.26) 0%, rgba(36, 54, 90, 0.4) 100%);
+  --glass-bg-strong: linear-gradient(165deg, rgba(60, 86, 136, 0.52) 0%, rgba(32, 48, 82, 0.68) 100%);
+  --glass-border: rgba(245, 239, 226, 0.18);
+  --glass-blur: blur(14px) saturate(150%);
+
+  /* 字体：全站主字体＝霞鹜文楷（本地托管，离线可用；SIL OFL-1.1），
+     衬线/黑体栈仅作回退（2026-10-16 用户决议：升级「高级感」字体） */
+  --font-title: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'STSong', 'Source Han Serif SC',
+    'SimSun', serif;
+  --font-body: 'LXGW WenKai', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans SC', system-ui, sans-serif;
+
+  --radius: 12px;
+  --shadow-lift: 0 18px 40px rgba(8, 14, 28, 0.4);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
+  /* 正文字号缩放（设置面板：小 0.9 / 标准 1 / 大 1.2，由 useSettings 写入） */
+  --font-scale: 1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ink-deep);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+textarea,
+input {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* 纸纹颗粒（用于所有底版，统一"一部片子"的质感） */
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- 按钮 ---------- */
+.btn {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 13px 16px 13px 18px;
+  text-align: left;
+  background: linear-gradient(180deg, rgba(56, 82, 126, 0.5), rgba(34, 52, 86, 0.62));
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius);
+  color: var(--text);
+  line-height: 1.6;
+  transition: border-color 0.22s ease, background 0.22s ease, transform 0.12s ease;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  background: var(--gold);
+  transform: translateY(-50%);
+  transition: height 0.22s ease;
+}
+
+.btn:focus-visible {
+  border-color: var(--hairline);
+  background: linear-gradient(180deg, rgba(232, 163, 61, 0.18), rgba(34, 52, 86, 0.68));
+  outline: 2px solid rgba(232, 163, 61, 0.6);
+  outline-offset: 2px;
+}
+
+/* 悬停只在有指针的设备上生效，防触屏「粘滞 hover」（UI 设计书 §7） */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    border-color: var(--hairline);
+    background: linear-gradient(180deg, rgba(232, 163, 61, 0.18), rgba(34, 52, 86, 0.68));
+    outline: none;
+  }
+
+  .btn:hover::before {
+    height: 62%;
+  }
+
+  .btn-ghost:hover {
+    color: var(--text);
+    border-color: var(--hairline);
+    background: rgba(232, 163, 61, 0.08);
+  }
+
+  .btn-gold:hover {
+    background: linear-gradient(180deg, rgba(255, 182, 92, 0.98), rgba(210, 140, 40, 0.98));
+  }
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:active::before {
+  height: 100%;
+  transition: height 0.12s ease;
+}
+
+/* 选中 / 激活：灯火稳定，保持至转场（UI 设计书 §4.2） */
+.btn.is-selected {
+  border-color: rgba(232, 163, 61, 0.6);
+  background: linear-gradient(180deg, rgba(232, 163, 61, 0.26), rgba(34, 52, 86, 0.68));
+}
+
+.btn.is-selected::before {
+  height: 100%;
+}
+
+.btn-inline {
+  display: inline-block;
+  width: auto;
+  text-align: center;
+  padding: 9px 18px;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--hairline-soft);
+  color: var(--text-dim);
+  text-align: center;
+  padding: 8px 14px;
+}
+
+.btn-gold {
+  background: linear-gradient(180deg, rgba(232, 163, 61, 0.92), rgba(196, 128, 34, 0.92));
+  border-color: rgba(255, 182, 92, 0.6);
+  color: #21160a;
+  font-weight: 600;
+  text-align: center;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- 触控热区扩展（UI 设计书 §4.2：视觉不变，热区 ≥44px） ---------- */
+.touch-44 {
+  position: relative;
+}
+
+.touch-44::after {
+  content: '';
+  position: absolute;
+  inset: -5px -6px;
+}
+
+/* ---------- 「竹篾角」母题（UI 设计书 §3：1px 双短线，暖金 22%） ----------
+   只允许出现在：选项组外框的左上＋右下、回看/面板的左上＋右下。
+   每屏至多一组，不做四角对称（避免滑向"国潮模板感"）。 */
+.bamboo-corner {
+  position: relative;
+}
+
+.bamboo-corner::before,
+.bamboo-corner::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  border-color: rgba(232, 163, 61, 0.22);
+  border-style: solid;
+  border-width: 0;
+  /* 第二道短线：内收 4px 的短竹篾 */
+  background-image: linear-gradient(rgba(232, 163, 61, 0.14), rgba(232, 163, 61, 0.14)),
+    linear-gradient(rgba(232, 163, 61, 0.14), rgba(232, 163, 61, 0.14));
+  background-repeat: no-repeat;
+}
+
+.bamboo-corner::before {
+  left: -7px;
+  top: -7px;
+  border-left-width: 1px;
+  border-top-width: 1px;
+  background-size: 7px 1px, 1px 7px;
+  background-position: 5px 0, 0 5px;
+}
+
+.bamboo-corner::after {
+  right: -7px;
+  bottom: -7px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  background-size: 7px 1px, 1px 7px;
+  background-position: right 5px bottom 0, right 0 bottom 5px;
+}
+
+
+/* ---------- 行样式（对白 / 旁白 / 舞台 / 短信 / 引用） ---------- */
+.line-narration {
+  color: var(--text);
+}
+
+.line-dialogue {
+  color: var(--paper);
+}
+
+/* 剧本舞台、音效、交互提示 —— 审核模式的"透明层" */
+.line-stage {
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: rgba(110, 139, 122, 0.92);
+  border-left: 2px dashed rgba(110, 139, 122, 0.45);
+  padding-left: 10px;
+  font-family: var(--font-title);
+  letter-spacing: 0.02em;
+}
+
+/* 编剧条件备注 */
+.line-note {
+  font-size: 14.5px;
+  color: rgba(232, 163, 61, 0.72);
+  border-left: 2px dotted rgba(232, 163, 61, 0.5);
+  padding-left: 10px;
+}
+
+/* 短信 / 旧信：不再加内层小框（UI 设计书 r3），与对白同一呈现，只留纸色 */
+.line-sms {
+  color: var(--paper);
+}
+
+/* 引用式（灯谱纸条、字幕） */
+.line-quote {
+  font-family: var(--font-title);
+  font-size: 19px;
+  line-height: 1.9;
+  color: var(--candle);
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.line-subtitle {
+  font-family: var(--font-title);
+  font-size: 21.5px;
+  letter-spacing: 0.18em;
+  color: var(--candle);
+  text-align: center;
+}
+
+/* AI 生成标识 */
+.ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  border: 1px solid rgba(232, 163, 61, 0.45);
+  border-radius: 4px;
+  padding: 1px 6px;
+  vertical-align: middle;
+}
+
+/* ---------- 动画 ---------- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.anim-fade {
+  animation: fade-in 0.5s ease both;
+}
+
+.anim-rise {
+  animation: rise-in 0.42s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade,
+  .anim-rise {
+    animation: none;
+  }
+}
+
+/* ---------- 滚动条 ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 163, 61, 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(232, 163, 61, 0.3);
+  border-radius: 3px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
