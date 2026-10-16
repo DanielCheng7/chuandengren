@@ -16,7 +16,8 @@ defineProps<{
 
 <template>
   <div class="card-stage" aria-live="polite">
-    <Transition name="card">
+    <!-- mode="out-in"：旧卡先淡出、新卡再淡入，相邻旁白字卡切换时文字不重叠、更从容 -->
+    <Transition name="card" mode="out-in">
       <p v-if="text" :key="lineKey" class="card-text">{{ text }}</p>
     </Transition>
   </div>
@@ -48,22 +49,28 @@ defineProps<{
   text-shadow: 0 2px 22px rgba(8, 14, 28, 0.85), 0 0 60px rgba(8, 14, 28, 0.5);
 }
 
-/* 渐入 / 渐隐（UI 设计书 §6 动效白名单） */
+/* 弹出：从容淡入 + 轻微上浮收拢（序章蒙太奇旁白，慢节奏，柔和 ease-out） */
 .card-enter-active {
-  transition: opacity 0.7s ease, transform 0.7s ease;
+  transition:
+    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* 消失：轻盈上浮淡出（与弹出对称，先快后缓） */
 .card-leave-active {
-  transition: opacity 0.55s ease;
+  transition:
+    opacity 0.45s cubic-bezier(0.55, 0, 0.55, 0.2),
+    transform 0.45s cubic-bezier(0.55, 0, 0.55, 0.2);
 }
 
 .card-enter-from {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(16px) scale(0.985);
 }
 
 .card-leave-to {
   opacity: 0;
+  transform: translateY(-8px);
 }
 
 @media (prefers-reduced-motion: reduce) {
