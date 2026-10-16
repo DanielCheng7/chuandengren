@@ -5,7 +5,7 @@
  */
 import { reactive, watch } from 'vue'
 
-const KEY = 'chuandengren.settings.v3'
+const KEY = 'chuandengren.settings.v4'
 
 export interface Settings {
   /** 打字机效果 */
@@ -28,8 +28,10 @@ function defaults(): Settings {
   return {
     typewriter: true,
     typewriterSpeed: 26,
-    showStageNotes: true,
-    showChoiceIds: true,
+    // 默认＝玩家视角（演示模式）：舞台/音效注记、选项编号均隐藏；
+    // 创作团队核对时用 Shift+D 打开调试面板 → 「审核模式」一键显形（2026-10-16 用户决议）
+    showStageNotes: false,
+    showChoiceIds: false,
     showDevPanel: false,
     volume: 70,
     fontScale: 1,

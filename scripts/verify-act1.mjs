@@ -184,7 +184,43 @@ try {
   let s = await waitNode(['PRO-1'])
   check('① 开始后进入 PRO-1（序章蒙太奇）', !!s, s ? `nodeId=${s.nodeId}` : '未进入')
   await sleep(700)
+
+  /* ①-b 玩家视角（演示模式＝默认）：画面/声音/节点号等舞台注记不得显示 */
+  const bodyText1 = await evaluate(`document.body.innerText`)
+  const hasStageText =
+    typeof bodyText1 === 'string' &&
+    (bodyText1.includes('【PRO-1】') ||
+      bodyText1.includes('画面：') ||
+      bodyText1.includes('声音：') ||
+      bodyText1.includes('场景底版'))
+  check('①-b 演示模式（默认）不显示舞台注记', hasStageText === false)
   await screenshot('pro1')
+
+  /* ①-c 审核模式：Shift+D 开面板 → 点「审核模式」→ 重开，舞台注记应显示 */
+  await evaluate(
+    `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'D', shiftKey: true }))`
+  )
+  await sleep(300)
+  await evaluate(
+    `[...document.querySelectorAll('.dev .mini')].find(b => b.textContent.includes('审核模式'))?.click()`
+  )
+  await sleep(300)
+  await evaluate(
+    `[...document.querySelectorAll('.tool')].find(b => b.textContent.includes('重新开始'))?.click()`
+  )
+  await sleep(500)
+  const bodyText2 = await evaluate(`document.body.innerText`)
+  const hasStageInReview = typeof bodyText2 === 'string' && bodyText2.includes('【PRO-1】竹')
+  check('①-c 审核模式显示舞台注记（供创作团队）', hasStageInReview === true)
+  // 切回演示模式并关闭调试面板，保持后续截图干净
+  await evaluate(
+    `[...document.querySelectorAll('.dev .mini')].find(b => b.textContent.includes('演示模式'))?.click()`
+  )
+  await sleep(200)
+  await evaluate(
+    `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'D', shiftKey: true }))`
+  )
+  await sleep(300)
 
   /* ② 跳过序章 → C1-1 */
   const skipClicked = await evaluate(`(() => {
