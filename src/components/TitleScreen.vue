@@ -11,6 +11,8 @@ import SettingsPanel from './SettingsPanel.vue'
 import type { StoryEngine } from '@/composables/useStoryEngine'
 
 const props = defineProps<{ engine: StoryEngine }>()
+/** 「开始旅程」交给上层（App）先播开场 CG，播完再正式开局 */
+const emit = defineEmits<{ (e: 'begin'): void }>()
 
 // RISK-7 修复：改用引擎暴露的响应式 saveExists 标记（persist/loadSave/restart 时维护），
 // 不再依赖"组件重挂载才重新读 localStorage"的隐式行为
@@ -49,7 +51,7 @@ onMounted(() => props.engine.hasSave())
 
     <!-- 菜单带：横向按键排（大字 + 小字注） -->
     <nav class="menu-band" aria-label="主菜单">
-      <button class="menu-item is-primary" type="button" @click="props.engine.startFresh()">
+      <button class="menu-item is-primary" type="button" @click="emit('begin')">
         <span class="menu-main">开始旅程</span>
         <span class="menu-sub">START</span>
       </button>

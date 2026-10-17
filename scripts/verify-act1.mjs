@@ -177,12 +177,24 @@ try {
   await sleep(400)
   await screenshot('title')
 
-  /* ① 开始 → PRO-1a */
+  /* ⓪ 开始旅程 → 开场 CG → 跳过/播完 → ① PRO-1a */
   await evaluate(
     `[...document.querySelectorAll('.menu-item')].find(x => x.textContent.includes('开始'))?.click()`
   )
+  let cgAppeared = false
+  for (let i = 0; i < 30; i++) {
+    if ((await evaluate(`!!document.querySelector('.cg-video')`)) === true) {
+      cgAppeared = true
+      break
+    }
+    await sleep(200)
+  }
+  check('⓪ 开始旅程后自动播放开场 CG', cgAppeared)
+  await sleep(600)
+  await screenshot('opening-cg')
+  await evaluate(`document.querySelector('.cg-skip')?.click()`)
   let s = await waitNode(['PRO-1a'])
-  check('① 开始后进入 PRO-1a（序章蒙太奇）', !!s, s ? `nodeId=${s.nodeId}` : '未进入')
+  check('① 开场 CG 结束后进入 PRO-1a（序章蒙太奇）', !!s, s ? `nodeId=${s.nodeId}` : '未进入')
   await sleep(700)
 
   /* ①-b 玩家视角（演示模式＝默认）：画面/声音/节点号等舞台注记不得显示 */

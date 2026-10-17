@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
  * 《传灯人》互动叙事网页原型
- * 屏幕路由：标题页 → 剧情页 → 结局页
+ * 屏幕路由：标题页 →（开场 CG）→ 剧情页 → 结局页
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import EndingScreen from './components/EndingScreen.vue'
+import OpeningCg from './components/OpeningCg.vue'
 import StoryScreen from './components/StoryScreen.vue'
 import TitleScreen from './components/TitleScreen.vue'
 import { useStoryEngine } from './composables/useStoryEngine'
@@ -16,11 +17,19 @@ const view = computed<'title' | 'story' | 'ending'>(() => {
   if (engine.phase.value === 'end') return 'ending'
   return 'story'
 })
+
+/** 开场 CG：点「开始旅程」后先全屏播放，播完（或跳过后）再正式进入序章 */
+const showCg = ref(false)
+function finishCg() {
+  showCg.value = false
+  engine.startFresh()
+}
 </script>
 
 <template>
   <div class="app-shell grain">
-    <TitleScreen v-if="view === 'title'" :engine="engine" />
+    <OpeningCg v-if="showCg" @done="finishCg" />
+    <TitleScreen v-else-if="view === 'title'" :engine="engine" @begin="showCg = true" />
     <EndingScreen v-else-if="view === 'ending'" :engine="engine" />
     <StoryScreen v-else :engine="engine" />
   </div>
