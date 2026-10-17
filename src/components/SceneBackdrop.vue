@@ -2,13 +2,11 @@
 /**
  * 场景层（制作计划 §0.4 素材机制 / UI 设计书 r3 §6）
  *
- * 四层结构，全部"图片优先、缺图回落、代码零改动"：
+ * 三层结构，全部"图片优先、缺图回落、代码零改动"：
  *   ① 场景渐变图：每个场景一张独立渐变图（`grad_<key>.svg`，SceneLayer 实现，可替换）；
  *      切换场景时上一张交叉淡出（0.95s），不硬切；
  *   ② 真实场景图（AI 生图）：`bg_<key>.webp` 放进 public/assets/scenes/ 即生效，盖在渐变图上；
- *   ③ 可读性层：极淡暗角 + 夜场轻压暗；
- *   ④ 转场花光：切换场景时一层暖灯柔光雾盖住画面（光雾 + 背景模糊，1.5s 起落），
- *      「在光里」完成场景替换再褪去（参考同类作品转场；随 scene key 重放）。
+ *   ③ 可读性层：极淡暗角 + 夜场轻压暗。
  *
  * 素材清单与命名见《制作计划》§三对照表 /《人物设定与场景设计 r2》。
  */
@@ -133,9 +131,6 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
     <!-- ③ 可读性层 -->
     <div class="layer vignette" />
     <div class="layer scrim" :style="props.dim ? { opacity: props.dim } : undefined" />
-
-    <!-- ④ 转场花光：切换场景时一层暖灯柔光雾扫过（随 scene key 重放，参考同类作品转场） -->
-    <div :key="props.scene" class="layer bloom" aria-hidden="true" />
   </div>
 </template>
 
@@ -223,35 +218,6 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
   transition: opacity 0.6s ease;
 }
 
-/* 转场花光：暖灯柔光雾 + 背景模糊，1.5s 起落（「在光里」完成场景替换） */
-.bloom {
-  pointer-events: none;
-  opacity: 0;
-  -webkit-backdrop-filter: blur(9px) brightness(1.08) saturate(1.04);
-  backdrop-filter: blur(9px) brightness(1.08) saturate(1.04);
-  background:
-    radial-gradient(
-      circle at 50% 44%,
-      rgba(255, 219, 160, 0.5) 0%,
-      rgba(255, 200, 128, 0.26) 36%,
-      rgba(255, 200, 128, 0) 74%
-    ),
-    linear-gradient(180deg, rgba(255, 231, 190, 0.42) 0%, rgba(255, 205, 140, 0.26) 100%);
-  animation: scene-bloom 1.5s ease-in-out both;
-}
-
-@keyframes scene-bloom {
-  0% {
-    opacity: 0;
-  }
-  30% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .fading {
     display: none;
@@ -263,10 +229,6 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
 
   /* 减弱动效：不保留旧图渐隐层，直接切换为新图 */
   .photo.is-prev {
-    display: none;
-  }
-
-  .bloom {
     display: none;
   }
 }

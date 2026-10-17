@@ -41,9 +41,10 @@ onMounted(() => props.engine.hasSave())
     <div class="aurora" />
     <div class="scale-frame" aria-hidden="true" />
 
+    <p class="sub">粤西·遂溪北坡游鱼 · 互动叙事</p>
+
     <div class="stage">
       <h1 class="name">传灯人</h1>
-      <p class="sub">粤西·遂溪北坡游鱼 · 互动叙事</p>
     </div>
 
     <!-- 菜单带：横向按键排（大字 + 小字注） -->
@@ -162,12 +163,16 @@ onMounted(() => props.engine.hasSave())
 }
 
 .sub {
-  margin: 12px 0 24px;
+  position: absolute;
+  top: 5%;
+  right: 4%;
+  margin: 0;
+  writing-mode: vertical-rl;
   font-family: var(--font-title);
-  font-size: clamp(20px, 2.6vw, 24px);
-  letter-spacing: 0.16em;
-  text-indent: 0.16em;
+  font-size: clamp(18px, 2.2vw, 22px);
+  letter-spacing: 0.32em;
   color: var(--paper);
+  text-shadow: 0 0 14px rgba(255, 182, 92, 0.28);
   animation: fade-in 1.1s ease both;
 }
 
