@@ -257,8 +257,9 @@ watch(phase, scheduleChoicesReady)
   >
     <SceneBackdrop :scene="e.sceneKey.value" :blur="showChoices" :backdrop="e.node.value?.backdrop" />
 
-    <!-- 转场角标水印：随场景切换浮出（2.4s 起落，UI 设计书 r4 §6） -->
-    <Watermark :key="e.sceneKey.value" />
+    <!-- 幕间角标水印：仅幕（章）切换时浮出（2.4s 起落，UI 设计书 r4 §6）；
+         普通场景切换不再浮出（2026-10-17 用户决议） -->
+    <Watermark :key="e.chapter.value" />
 
     <!-- 舞台 -->
     <main class="stage" @click="onStageClick">
