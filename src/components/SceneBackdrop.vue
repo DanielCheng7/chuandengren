@@ -41,12 +41,20 @@ watch(
     }, 1000)
   }
 )
-onUnmounted(() => window.clearTimeout(prevTimer))
+onUnmounted(() => {
+  window.clearTimeout(prevTimer)
+  window.clearTimeout(clearPrevTimer)
+})
 
 /** 真实图片是否可用（404 时自动回落渐变图）；序章单屏图（backdrop）与场景素材图（bg_<key>.webp）共用 */
 const imageOk = ref(true)
-/** 实际显示给 <img> 的 src：预加载完成后再切换，避免 src 突变瞬间的空白闪烁（序章连切 8 图） */
-const displayedSrc = ref('')
+/** 当前底图（渐显后的稳定态，不透明，垫在渐隐层之下） */
+const currentSrc = ref('')
+/** 上一张图（渐隐层，交叉溶解时覆盖在底图之上、逐渐淡出） */
+const prevSrc = ref('')
+/** 首图入场标记：仅第一张做柔和渐显，后续切换由「旧图渐隐揭示新图」完成（避免双层半透明漏底） */
+const firstEnter = ref(true)
+let clearPrevTimer: number | undefined
 
 function targetSrc(): string {
   if (props.backdrop) return `/assets/scenes/${props.backdrop}`
@@ -59,14 +67,25 @@ watch(
     imageOk.value = true
     const target = targetSrc()
     if (!target) {
-      displayedSrc.value = ''
+      currentSrc.value = ''
+      prevSrc.value = ''
+      window.clearTimeout(clearPrevTimer)
       return
     }
-    // 预加载：新图加载完成后再切换到 displayedSrc（旧图保持、无闪烁）；
+    // 预加载：新图加载完成后再交叉溶解——旧图升到渐隐层（1→0 淡出），
+    // 新图作为不透明底图垫在下面被揭示（无闪烁、无漏底）；
     // onload 时校验目标未变——快速连续切换时丢弃过期预加载（竞态防护）
     const pre = new Image()
     pre.onload = () => {
-      if (targetSrc() === target) displayedSrc.value = target
+      if (targetSrc() !== target) return
+      window.clearTimeout(clearPrevTimer)
+      const had = !!currentSrc.value
+      prevSrc.value = currentSrc.value
+      currentSrc.value = target
+      firstEnter.value = !had
+      clearPrevTimer = window.setTimeout(() => {
+        prevSrc.value = ''
+      }, 900)
     }
     pre.onerror = () => {
       if (targetSrc() === target) imageOk.value = false
@@ -76,7 +95,7 @@ watch(
   { immediate: true }
 )
 
-const showImage = computed(() => !!displayedSrc.value && imageOk.value)
+const showImage = computed(() => !!currentSrc.value && imageOk.value)
 </script>
 
 <template>
@@ -91,13 +110,24 @@ const showImage = computed(() => !!displayedSrc.value && imageOk.value)
     <SceneLayer :scene="props.scene" />
     <SceneLayer v-if="prevScene" :scene="prevScene" class="fading" />
 
-    <!-- ② 素材位：真实场景图，文件存在即生效 -->
+    <!-- ② 素材位：真实场景图，文件存在即生效。
+         双图层交叉溶解：底图（当前）不透明，渐隐层（上一张）在其上 1→0 淡出揭示新图 -->
     <img
       v-if="showImage"
-      class="layer photo"
-      :src="displayedSrc"
+      :key="currentSrc"
+      class="layer photo is-current"
+      :class="{ 'is-first': firstEnter }"
+      :src="currentSrc"
       :alt="props.backdrop ?? def.name"
       @error="imageOk = false"
+    />
+    <img
+      v-if="showImage && prevSrc"
+      :key="prevSrc"
+      class="layer photo is-prev"
+      :src="prevSrc"
+      alt=""
+      aria-hidden="true"
     />
 
     <!-- ③ 可读性层 -->
@@ -154,7 +184,25 @@ const showImage = computed(() => !!displayedSrc.value && imageOk.value)
   height: 100%;
   object-fit: cover;
   filter: saturate(0.96) brightness(0.94);
-  animation: fade-in 0.8s ease both;
+}
+
+/* 底图：仅首图做柔和渐显；后续切换保持不透明垫底，避免与渐隐层双层半透明漏底 */
+.photo.is-current.is-first {
+  animation: fade-in 0.9s ease both;
+}
+
+/* 渐隐层：上一张图淡出，揭示下面的新图（交叉溶解） */
+.photo.is-prev {
+  animation: photo-fade-out 0.9s ease forwards;
+}
+
+@keyframes photo-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .vignette {
@@ -211,6 +259,11 @@ const showImage = computed(() => !!displayedSrc.value && imageOk.value)
 
   .photo {
     animation: none;
+  }
+
+  /* 减弱动效：不保留旧图渐隐层，直接切换为新图 */
+  .photo.is-prev {
+    display: none;
   }
 
   .bloom {

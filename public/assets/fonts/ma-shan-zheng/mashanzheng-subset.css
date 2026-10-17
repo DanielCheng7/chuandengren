@@ -1,0 +1,11 @@
+/* 马善政毛笔楷书（Ma Shan Zheng，SIL OFL-1.1 开源字体）
+   仅子集「传灯人」三字用于标题页题名，本地托管、离线可用；
+   完整字体见 https://github.com/google/fonts/tree/main/ofl/mashanzheng */
+@font-face {
+  font-family: 'Ma Shan Zheng';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./mashanzheng-subset.woff2') format('woff2');
+  unicode-range: U+4eba, U+4f20, U+706f;
+}

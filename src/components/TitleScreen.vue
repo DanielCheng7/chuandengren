@@ -8,7 +8,6 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import AiFish from './AiFish.vue'
-import LanternVisual from './LanternVisual.vue'
 import SettingsPanel from './SettingsPanel.vue'
 import type { StoryEngine } from '@/composables/useStoryEngine'
 
@@ -44,18 +43,10 @@ onMounted(() => props.engine.hasSave())
     <div class="scale-frame" aria-hidden="true" />
 
     <div class="stage">
-      <div class="visuals">
-        <LanternVisual state="half" :size="300" />
-        <AiFish state="idle" :size="104" class="fish" />
-      </div>
+      <AiFish state="idle" :size="104" class="fish" />
 
       <h1 class="name">传灯人</h1>
       <p class="sub">粤西·遂溪北坡游鱼（省级非遗）· 互动叙事</p>
-
-      <p class="intro">
-        一盏奶奶没做完的鱼灯，一个想用 AI 复原一切的返乡大学生。你替林知遥做出每一次选择，也替他回答
-        AI 阿鲟的每一次追问。
-      </p>
     </div>
 
     <!-- 菜单带：横向按键排（大字 + 小字注） -->
@@ -161,30 +152,23 @@ onMounted(() => props.engine.hasSave())
   text-align: center;
 }
 
-.visuals {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  margin-bottom: 6px;
-}
-
 .fish {
   position: absolute;
-  right: 6%;
-  top: -6px;
+  right: 13%;
+  top: 26%;
   opacity: 0.9;
+  pointer-events: none;
 }
 
 .name {
   margin: 0;
-  font-family: var(--font-title);
-  font-size: clamp(40px, 11.5vw, 64px);
-  font-weight: 500;
-  letter-spacing: 0.28em;
-  text-indent: 0.28em;
+  font-family: var(--font-display);
+  font-size: clamp(56px, 14vw, 88px);
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
   color: var(--paper);
-  text-shadow: 0 0 26px rgba(255, 182, 92, 0.32);
+  text-shadow: 0 0 30px rgba(255, 182, 92, 0.4);
   animation: fade-in 0.9s ease both;
 }
 
@@ -194,14 +178,6 @@ onMounted(() => props.engine.hasSave())
   letter-spacing: 0.14em;
   color: var(--gold);
   animation: fade-in 1.1s ease both;
-}
-
-.intro {
-  margin: 0 auto;
-  max-width: 30em;
-  font-size: 18.5px;
-  line-height: 1.95;
-  color: var(--text-dim);
 }
 
 /* ---------- 菜单带（横向按键排） ---------- */

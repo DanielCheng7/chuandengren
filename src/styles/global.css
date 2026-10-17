@@ -37,6 +37,9 @@
     'SimSun', serif;
   --font-body: 'LXGW WenKai', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     'Noto Sans SC', system-ui, sans-serif;
+  /* 标题页题名专用毛笔书法体（马善政毛笔楷书，仅「传灯人」子集，本地托管） */
+  --font-display: 'Ma Shan Zheng', 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'STSong',
+    serif;
 
   --radius: 12px;
   --shadow-lift: 0 18px 40px rgba(8, 14, 28, 0.4);
