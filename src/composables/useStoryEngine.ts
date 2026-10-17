@@ -314,6 +314,9 @@ export function useStoryEngine() {
   }
 
   function choose(choiceId: string) {
+    // 幂等防护：选项只在 choice 阶段生效——防止连点 / 选项离场动画期间误触
+    // 导致 effects 重复结算、历史重复（纵深防御；UI 层另有 selectedId 锁 + ready 门控）
+    if (phase.value !== 'choice') return
     const c = visibleChoices.value.find((x) => x.id === choiceId)
     if (!c) return
     // 死路防护（RISK-5）：空 outcome 且无 nextNodeId 时拒绝执行——
@@ -329,6 +332,8 @@ export function useStoryEngine() {
   }
 
   function usePreset(presetId: string) {
+    // 幂等防护：预设只在自由输入阶段有效（防连点重复结算）
+    if (phase.value !== 'input') return
     const cfg = node.value?.freeInput
     if (!cfg) return
     const p = cfg.presets.find((x) => x.id === presetId)
@@ -341,6 +346,8 @@ export function useStoryEngine() {
 
   /** 自由输入 → AI（判定层重写见步骤 29；现阶段沿用回应式 mock，保持可运行） */
   async function submitFreeInput(text: string) {
+    // 幂等防护：仅在等待输入时接受提交（防连点重复请求 / 重复计入 freeInputs）
+    if (phase.value !== 'input') return
     const cfg = node.value?.freeInput
     if (!cfg) return
     const trimmed = text.trim()
@@ -374,6 +381,8 @@ export function useStoryEngine() {
 
   /** AI 失败 / 超时后落到备用文本 */
   function useFallbackReply() {
+    // 幂等防护：仅在「AI 失败」态可用，防按钮重复点击重复播放备用段
+    if (aiStatus.value !== 'failed') return
     const n = node.value
     if (!n) return
     aiStatus.value = 'done'
