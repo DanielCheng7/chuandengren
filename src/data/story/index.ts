@@ -9,7 +9,7 @@ import { prologueNodes } from './prologue'
 import { c1Nodes } from './c1'
 
 /** 起始节点：序章第一屏 */
-export const START_NODE_ID = 'PRO-1'
+export const START_NODE_ID = 'PRO-1a'
 
 const NODE_GROUPS: StoryNode[][] = [
   prologueNodes,
@@ -44,7 +44,7 @@ export const storyOrder: string[] = ALL_NODES.map((n) => n.id)
  * 含尚未接入的章节——便于分章开发时快速核对断点（引擎会落到「未接入」幕间面板）。
  */
 export const CHAPTERS: { key: string; title: string; entry: string }[] = [
-  { key: 'PRO', title: '序章·一盏灯的一生', entry: 'PRO-1' },
+  { key: 'PRO', title: '序章·一盏灯的一生', entry: 'PRO-1a' },
   { key: 'C1', title: '第一章·灯往何处去', entry: 'C1-1' },
   { key: 'C2', title: '第二章·两条路', entry: 'C2-0' },
   { key: 'C3', title: '第三章·灯会前夜', entry: 'C3-1' },

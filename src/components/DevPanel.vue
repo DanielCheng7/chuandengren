@@ -53,7 +53,7 @@ const chapters = CHAPTERS
         >
           跳 {{ c.entry }}
         </button>
-        <button class="mini" type="button" @click="e.jumpTo('PRO-1')">回 PRO-1</button>
+        <button class="mini" type="button" @click="e.jumpTo('PRO-1a')">回 PRO-1a</button>
         <button class="mini danger" type="button" @click="e.restart()">重开</button>
       </div>
     </header>

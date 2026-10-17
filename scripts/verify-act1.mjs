@@ -6,7 +6,7 @@
  *   默认 url = http://127.0.0.1:4173/（先跑 npm run build && npm run preview）
  *
  * 验证点（V3.0，《开发文档》§6.3）：
- *   ① 标题 → 开始 → 存档 nodeId = PRO-1（序章蒙太奇）；
+ *   ① 标题 → 开始 → 存档 nodeId = PRO-1a（序章蒙太奇）；
  *   ② 「跳过序章」→ 直达 C1-1（跳过不计访问）；
  *   ③ C1-3 三错位排队：按 B（文创店）→ C（夜市摊）→ A（文化馆）顺序任选，
  *      每轮回到选择组选项递减（2 → 1 → 0）；全部看过自动汇合至 C1-5；
@@ -177,12 +177,12 @@ try {
   await sleep(400)
   await screenshot('title')
 
-  /* ① 开始 → PRO-1 */
+  /* ① 开始 → PRO-1a */
   await evaluate(
     `[...document.querySelectorAll('.menu-item')].find(x => x.textContent.includes('开始'))?.click()`
   )
-  let s = await waitNode(['PRO-1'])
-  check('① 开始后进入 PRO-1（序章蒙太奇）', !!s, s ? `nodeId=${s.nodeId}` : '未进入')
+  let s = await waitNode(['PRO-1a'])
+  check('① 开始后进入 PRO-1a（序章蒙太奇）', !!s, s ? `nodeId=${s.nodeId}` : '未进入')
   await sleep(700)
 
   /* ①-b 玩家视角（演示模式＝默认）：画面/声音/节点号等舞台注记不得显示 */

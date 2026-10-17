@@ -237,6 +237,16 @@ export interface StoryNode {
   freeInput?: FreeInputConfig
   /** 判定触点配置（kind='stance' 时；步骤 33 接入） */
   stance?: StanceConfig
+  /**
+   * 序章单屏背景图（相对 `/assets/scenes/` 的路径，如 `prologue/PRO-1a_竹林晨光.jpg`）。
+   * 图片优先、无图回落场景渐变（见 SceneBackdrop）。
+   */
+  backdrop?: string
+  /**
+   * 纯图片镜头停留时长（ms）：montage 节点无玩家可见文本行时，
+   * 展示 `backdrop` 停留该时长后自动推进（如序章「手与刀」无字镜头）。
+   */
+  holdMs?: number
   /** 幕末节点 */
   endOfAct?: boolean
   /** 编剧备注 */

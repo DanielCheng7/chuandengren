@@ -104,6 +104,8 @@ export function useStoryEngine() {
   const journeyLoading = ref(false)
   /** 是否存在可继续的存档（响应式标记，标题页「继续上次」按钮用；RISK-7 修复） */
   const saveExists = ref(false)
+  /** 纯图片镜头（montage + backdrop + holdMs）停留定时器 */
+  let holdTimer: number | undefined
 
   /* ---------------- 派生状态 ---------------- */
   const node = computed<StoryNode | undefined>(() => getNode(nodeId.value))
@@ -202,6 +204,13 @@ export function useStoryEngine() {
   }
 
   /* ---------------- 节点流转 ---------------- */
+  function clearHoldTimer() {
+    if (holdTimer) {
+      window.clearTimeout(holdTimer)
+      holdTimer = undefined
+    }
+  }
+
   function enterNode(id: string) {
     const n = getNode(id)
     if (!n) {
@@ -211,6 +220,7 @@ export function useStoryEngine() {
       persist()
       return
     }
+    clearHoldTimer()
     missingNodeId.value = null
     nodeId.value = id
     state.currentNodeId = id
@@ -222,7 +232,20 @@ export function useStoryEngine() {
     lineIndex.value = 0
     phase.value = 'lines'
     recordLine()
-    if (lines.value.length === 0) afterLines()
+    if (lines.value.length === 0) {
+      // 纯图片镜头（序章 montage：无玩家可见文本行但有 backdrop + holdMs）——
+      // 展示图片停留 holdMs 后自动推进（点击可跳过）
+      if (n.kind === 'montage' && n.backdrop && n.holdMs) {
+        holdTimer = window.setTimeout(() => {
+          holdTimer = undefined
+          if (nodeId.value === id && phase.value === 'lines') afterLines()
+        }, n.holdMs)
+        persist()
+        return
+      }
+      afterLines()
+      return
+    }
     persist()
   }
 

@@ -17,7 +17,13 @@ import SceneLayer from './SceneLayer.vue'
 import { getScene } from '@/data/scenes'
 import type { SceneKey } from '@/types/story'
 
-const props = defineProps<{ scene: SceneKey; dim?: number; blur?: boolean }>()
+const props = defineProps<{
+  scene: SceneKey
+  dim?: number
+  blur?: boolean
+  /** 单屏背景图（相对 /assets/scenes/ 的路径，如 prologue/PRO-1a_竹林晨光.jpg）；优先于场景素材图 */
+  backdrop?: string
+}>()
 
 const def = computed(() => getScene(props.scene))
 
@@ -37,11 +43,14 @@ watch(
 )
 onUnmounted(() => window.clearTimeout(prevTimer))
 
-/** 真实场景图是否可用（404 时自动回落渐变图） */
+/** 真实图片是否可用（404 时自动回落渐变图）；序章单屏图（backdrop）与场景素材图（bg_<key>.webp）共用 */
 const imageOk = ref(true)
-const imageSrc = computed(() => (def.value.asset ? `/assets/scenes/${def.value.asset}` : ''))
+const imageSrc = computed(() => {
+  if (props.backdrop) return `/assets/scenes/${props.backdrop}`
+  return def.value.asset ? `/assets/scenes/${def.value.asset}` : ''
+})
 watch(
-  () => props.scene,
+  () => [props.scene, props.backdrop],
   () => {
     imageOk.value = true
   }
@@ -66,7 +75,7 @@ const showImage = computed(() => !!imageSrc.value && imageOk.value)
       v-if="showImage"
       class="layer photo"
       :src="imageSrc"
-      :alt="def.name"
+      :alt="props.backdrop ?? def.name"
       @error="imageOk = false"
     />
 

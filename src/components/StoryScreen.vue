@@ -68,6 +68,12 @@ const lanternState = computed<'half' | 'digital' | 'lit'>(() => {
 /** 序章蒙太奇：可跳过不可快进（《开发文档》§6.3） */
 const isMontage = computed(() => e.node.value?.kind === 'montage')
 
+/** 纯图片镜头（序章 montage 无字屏）：对白框隐去，只留画面 */
+const isHoldShot = computed(() => {
+  const n = e.node.value
+  return !!n && n.kind === 'montage' && e.lines.value.length === 0 && !!n.backdrop
+})
+
 /** 场景谐调色：对话带 / 选项带随场景一并切换（写入 --tint，供组件消费；2026-10-16 用户决议） */
 const sceneTint = computed(() => getSceneTint(e.sceneKey.value))
 
@@ -255,7 +261,7 @@ watch(phase, scheduleChoicesReady)
     :class="{ 'ui-hidden': hudHidden, 'is-choosing': showChoices, 'overlay-open': showHistory }"
     :style="{ '--tint': sceneTint }"
   >
-    <SceneBackdrop :scene="e.sceneKey.value" :blur="showChoices" />
+    <SceneBackdrop :scene="e.sceneKey.value" :blur="showChoices" :backdrop="e.node.value?.backdrop" />
 
     <!-- 转场角标水印：随场景切换浮出（2.4s 起落，UI 设计书 r4 §6） -->
     <Watermark :key="e.sceneKey.value" />
@@ -309,7 +315,7 @@ watch(phase, scheduleChoicesReady)
                  只留问题/输入栏/预设选项——不再残留上一轮对话 -->
             <DialogueBox
               :line="displayLine"
-              :class="{ 'is-blank': !!sceneCardText || !!currentItem || showFreeInput }"
+              :class="{ 'is-blank': !!sceneCardText || !!currentItem || showFreeInput || isHoldShot }"
               @advance="e.advance()"
             />
           </div>
