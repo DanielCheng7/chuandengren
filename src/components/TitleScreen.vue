@@ -18,6 +18,8 @@ const props = defineProps<{ engine: StoryEngine }>()
 // 不再依赖"组件重挂载才重新读 localStorage"的隐式行为
 const hasSave = computed(() => props.engine.saveExists.value)
 const showSettings = ref(false)
+/** 背景视频是否可用（加载失败时隐藏，回落渐变背景） */
+const videoOk = ref(true)
 
 // 进入标题页时同步一次存档标记（读取旧存档场景），此后由引擎变更自动驱动
 onMounted(() => props.engine.hasSave())
@@ -25,6 +27,19 @@ onMounted(() => props.engine.hasSave())
 
 <template>
   <div class="title-screen grain">
+    <!-- 标题页背景视频（队友提供；无视频/加载失败时回落渐变背景）。
+         H.264 版为兼容性转码（原 HEVC 版在部分浏览器/GPU 不可解码，保留备用） -->
+    <video
+      v-if="videoOk"
+      class="bg-video"
+      autoplay
+      muted
+      loop
+      playsinline
+      aria-hidden="true"
+      src="/assets/scenes/主页面/主页面_h264.mp4"
+      @error="videoOk = false"
+    ></video>
     <div class="aurora" />
     <div class="scale-frame" aria-hidden="true" />
 
@@ -80,6 +95,16 @@ onMounted(() => props.engine.hasSave())
   flex-direction: column;
   overflow-y: auto;
   background: radial-gradient(ellipse at 50% 18%, #33517b 0%, #203150 58%, #182541 100%);
+}
+
+/* 背景视频：铺满、覆盖裁剪、不参与交互；其上文字/菜单保持清晰 */
+.bg-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }
 
 .aurora {

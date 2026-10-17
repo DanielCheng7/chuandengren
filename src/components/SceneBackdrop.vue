@@ -45,17 +45,38 @@ onUnmounted(() => window.clearTimeout(prevTimer))
 
 /** 真实图片是否可用（404 时自动回落渐变图）；序章单屏图（backdrop）与场景素材图（bg_<key>.webp）共用 */
 const imageOk = ref(true)
-const imageSrc = computed(() => {
+/** 实际显示给 <img> 的 src：预加载完成后再切换，避免 src 突变瞬间的空白闪烁（序章连切 8 图） */
+const displayedSrc = ref('')
+
+function targetSrc(): string {
   if (props.backdrop) return `/assets/scenes/${props.backdrop}`
   return def.value.asset ? `/assets/scenes/${def.value.asset}` : ''
-})
+}
+
 watch(
   () => [props.scene, props.backdrop],
   () => {
     imageOk.value = true
-  }
+    const target = targetSrc()
+    if (!target) {
+      displayedSrc.value = ''
+      return
+    }
+    // 预加载：新图加载完成后再切换到 displayedSrc（旧图保持、无闪烁）；
+    // onload 时校验目标未变——快速连续切换时丢弃过期预加载（竞态防护）
+    const pre = new Image()
+    pre.onload = () => {
+      if (targetSrc() === target) displayedSrc.value = target
+    }
+    pre.onerror = () => {
+      if (targetSrc() === target) imageOk.value = false
+    }
+    pre.src = target
+  },
+  { immediate: true }
 )
-const showImage = computed(() => !!imageSrc.value && imageOk.value)
+
+const showImage = computed(() => !!displayedSrc.value && imageOk.value)
 </script>
 
 <template>
@@ -74,7 +95,7 @@ const showImage = computed(() => !!imageSrc.value && imageOk.value)
     <img
       v-if="showImage"
       class="layer photo"
-      :src="imageSrc"
+      :src="displayedSrc"
       :alt="props.backdrop ?? def.name"
       @error="imageOk = false"
     />

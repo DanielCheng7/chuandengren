@@ -39,7 +39,7 @@ export const prologueNodes: StoryNode[] = [
     nextNodeId: 'PRO-1b',
   },
 
-  /* ============ PRO-1b｜竹 · 手与刀（无字镜头） ============ */
+  /* ============ PRO-1b｜竹 · 手与刀（旁白延续） ============ */
   {
     id: 'PRO-1b',
     chapter: CHAPTER,
@@ -47,11 +47,11 @@ export const prologueNodes: StoryNode[] = [
     scene: 'dry_field',
     kind: 'montage',
     backdrop: B('PRO-1b_手与刀.jpg'),
-    holdMs: 2500,
     lines: [
       stage('【PRO-1】竹（2/2 手与刀）'),
       stage('画面：一只手握篾刀入竹，刀锋劈开的瞬间，竹纤维绽出细白的绒。'),
       stage('声音：篾刀脆响。'),
+      caption('一条鱼，先是一根竹。'),
     ],
     nextNodeId: 'PRO-2a',
   },

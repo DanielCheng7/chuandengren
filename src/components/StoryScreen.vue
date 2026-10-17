@@ -19,7 +19,6 @@ import DialogueBox from './DialogueBox.vue'
 import FreeInput from './FreeInput.vue'
 import HistoryPanel from './HistoryPanel.vue'
 import ItemShowcase from './ItemShowcase.vue'
-import LanternVisual from './LanternVisual.vue'
 import SceneBackdrop from './SceneBackdrop.vue'
 import SceneCard from './SceneCard.vue'
 import SettingsPanel from './SettingsPanel.vue'
@@ -58,14 +57,6 @@ const overlayOpen = computed(
   () => showHistory.value || showSettings.value || settings.showDevPanel
 )
 
-const lanternState = computed<'half' | 'digital' | 'lit'>(() => {
-  // V3.0：序章～第三章为半成品态（工艺进行中）；C4 创新链后转数字态；
-  // 'lit'（点亮态）用于结局与尾声（结局页组件自持，步骤 35–38）。
-  if (e.state.route === 'B') return 'digital'
-  return 'half'
-})
-
-/** 序章蒙太奇：可跳过不可快进（《开发文档》§6.3） */
 const isMontage = computed(() => e.node.value?.kind === 'montage')
 
 /** 纯图片镜头（序章 montage 无字屏）：对白框隐去，只留画面 */
@@ -148,6 +139,9 @@ const itemText = computed<string | null>(() => {
 })
 
 const cardToken = computed(() => `${e.nodeId.value}:${e.lineIndex.value}`)
+/** 字卡过场 key：用显示文本——同文延续、异文过场。
+ *  序章「一条鱼，先是一根竹。」横跨 PRO-1a（竹林）／PRO-1b（手与刀）两张图时不重新弹出。 */
+const sceneCardKey = computed(() => sceneCardText.value ?? '')
 
 let cardTimer: number | undefined
 function clearCardTimer() {
@@ -269,7 +263,6 @@ watch(phase, scheduleChoicesReady)
     <!-- 舞台 -->
     <main class="stage" @click="onStageClick">
       <div class="props" :class="{ 'is-choosing': showChoices, 'is-inputting': showFreeInput }">
-        <LanternVisual :state="lanternState" :size="212" />
         <CharacterLayer :speaker="speakerForLayer" />
 
         <!-- 抉择：出现在画面中央（2026-10-16 用户决议）；进出带柔和过渡（防闪屏） -->
@@ -303,7 +296,7 @@ watch(phase, scheduleChoicesReady)
       <p v-if="settings.showStageNotes" class="scene-tag">场景底版：{{ e.sceneKey.value }}</p>
 
       <!-- 场景旁白：画面中央字卡（渐入 → 停留 → 渐隐 → 自动推进，UI 设计书 r3 §4.6） -->
-      <SceneCard :text="sceneCardText" :line-key="cardToken" />
+      <SceneCard :text="sceneCardText" :line-key="sceneCardKey" />
 
       <!-- 道具亮相：整屏光雾 + 中央道具 + 文字（渐入 → 停留 → 渐隐 → 自动推进，UI 设计书 r4 §4.6） -->
       <ItemShowcase :line="currentItem" :text="itemText" :line-key="cardToken" />
