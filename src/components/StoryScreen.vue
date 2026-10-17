@@ -27,7 +27,7 @@ import { useSettings } from '@/composables/useSettings'
 import { AI_FALLBACK_BUTTON, AI_THINKING_TEXT } from '@/data/fallbackDialogue'
 import { getSceneTint } from '@/data/scenes'
 import type { StoryEngine } from '@/composables/useStoryEngine'
-import type { Line } from '@/types/story'
+import type { Line, SceneKey } from '@/types/story'
 
 const props = defineProps<{ engine: StoryEngine }>()
 const { settings } = useSettings()
@@ -65,8 +65,30 @@ const isHoldShot = computed(() => {
   return !!n && n.kind === 'montage' && e.lines.value.length === 0 && !!n.backdrop
 })
 
-/** 场景谐调色：对话带 / 选项带随场景一并切换（写入 --tint，供组件消费；2026-10-16 用户决议） */
-const sceneTint = computed(() => getSceneTint(e.sceneKey.value))
+/**
+ * 幕基调场景：一幕内统一背景色板与 UI 主题色，避免场景切换时配色频繁跳变
+ * （2026-10-17 用户决议：一幕中不频繁变更主题配色、切换不瞬间曝光）。
+ * 未列出的幕回落到当前场景（后续章节正式接入时按需补充）。
+ */
+const CHAPTER_SCHEME: Record<string, SceneKey> = {
+  '序章·一盏灯的一生': 'dry_field',
+  '第一章·灯往何处去': 'laoxu_street',
+}
+/** 未显式映射的幕：进入该幕时记录首个场景作为基调，幕内固定不变（后续章节接入也不会跳色） */
+const schemeFallback = ref<SceneKey>(e.sceneKey.value)
+watch(
+  () => e.chapter.value,
+  () => {
+    schemeFallback.value = e.sceneKey.value
+  },
+  { immediate: true }
+)
+const schemeScene = computed<SceneKey>(
+  () => CHAPTER_SCHEME[e.chapter.value] ?? schemeFallback.value
+)
+
+/** 场景谐调色：写入 --tint，供对话带 / 选项带消费；按幕统一（幕内不随场景跳色） */
+const sceneTint = computed(() => getSceneTint(schemeScene.value))
 
 /** 立绘层只在角色对白时出现；素材未到位时该层自动不渲染 */
 const speakerForLayer = computed(() => {
@@ -255,7 +277,12 @@ watch(phase, scheduleChoicesReady)
     :class="{ 'ui-hidden': hudHidden, 'is-choosing': showChoices, 'overlay-open': showHistory }"
     :style="{ '--tint': sceneTint }"
   >
-    <SceneBackdrop :scene="e.sceneKey.value" :blur="showChoices" :backdrop="e.node.value?.backdrop" />
+    <SceneBackdrop
+      :scene="e.sceneKey.value"
+      :scheme="schemeScene"
+      :blur="showChoices"
+      :backdrop="e.node.value?.backdrop"
+    />
 
     <!-- 幕间角标水印：仅幕（章）切换时浮出（2.4s 起落，UI 设计书 r4 §6）；
          普通场景切换不再浮出（2026-10-17 用户决议） -->
@@ -437,7 +464,7 @@ watch(phase, scheduleChoicesReady)
 .props.is-choosing > :not(.choice-layer),
 .props.is-inputting > * {
   opacity: 0.26;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.45s ease;
 }
 
 /* ---------- 抉择层：画面中央 ---------- */
@@ -492,12 +519,13 @@ watch(phase, scheduleChoicesReady)
 }
 
 /* 中央层（抉择 / 输入）进出过渡：淡入淡出——防「突现突消」闪屏（2026-10-16 用户要求） */
+/* 选项带进出放柔：与背景虚化（0.55s）同步收放，选中后衔接不突兀（2026-10-17） */
 .layer-enter-active {
-  transition: opacity 0.32s ease;
+  transition: opacity 0.42s ease;
 }
 
 .layer-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.42s ease;
 }
 
 .layer-enter-from,

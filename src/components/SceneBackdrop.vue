@@ -17,26 +17,42 @@ import type { SceneKey } from '@/types/story'
 
 const props = defineProps<{
   scene: SceneKey
+  /**
+   * 幕基调场景：一幕内统一背景色板与氛围，避免场景切换时配色跳变
+   * （2026-10-17 用户决议）。不传时回落到 scene。
+   */
+  scheme?: SceneKey
   dim?: number
   blur?: boolean
   /** 单屏背景图（相对 /assets/scenes/ 的路径，如 prologue/PRO-1a_竹林晨光.jpg）；优先于场景素材图 */
   backdrop?: string
 }>()
 
-const def = computed(() => getScene(props.scene))
+/**
+ * 渐变与氛围实际使用的场景 key：
+ *  - 有 backdrop 单屏图（序章蒙太奇）→ 用当前 scene（逐图切换，图片盖住渐变，效果不变）；
+ *  - 无 backdrop（正片）→ 用幕基调 scheme（一幕内不换色，杜绝跳色与瞬间曝光）。
+ */
+const schemeKey = computed<SceneKey>(() =>
+  props.backdrop ? props.scene : props.scheme ?? props.scene
+)
+/** 底色/暗角/氛围（按幕统一） */
+const def = computed(() => getScene(schemeKey.value))
+/** 真实素材图（按具体场景，素材到位后才生效） */
+const sceneDef = computed(() => getScene(props.scene))
 
-/** 切场景交叉淡出：上一场景渐变图短暂保留并渐隐（UI 设计书 r3 §6） */
+/** 幕切换时渐变交叉淡出：上一渐变图短暂保留并渐隐（UI 设计书 r3 §6；幕内不切换） */
 const prevScene = ref<SceneKey | null>(null)
 let prevTimer: number | undefined
 watch(
-  () => props.scene,
+  schemeKey,
   (nv, ov) => {
     if (!ov || ov === nv) return
     prevScene.value = ov
     window.clearTimeout(prevTimer)
     prevTimer = window.setTimeout(() => {
       prevScene.value = null
-    }, 1000)
+    }, 1600)
   }
 )
 onUnmounted(() => {
@@ -56,7 +72,7 @@ let clearPrevTimer: number | undefined
 
 function targetSrc(): string {
   if (props.backdrop) return `/assets/scenes/${props.backdrop}`
-  return def.value.asset ? `/assets/scenes/${def.value.asset}` : ''
+  return sceneDef.value.asset ? `/assets/scenes/${sceneDef.value.asset}` : ''
 }
 
 watch(
@@ -104,8 +120,8 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
       { dim: props.dim, 'has-photo': showImage, 'is-blurred': props.blur },
     ]"
   >
-    <!-- ① 场景渐变图：当前层 + 上一场景交叉淡出层 -->
-    <SceneLayer :scene="props.scene" />
+    <!-- ① 场景渐变图：按幕基调统一（幕内不换色），幕切换时交叉淡出 -->
+    <SceneLayer :scene="schemeKey" />
     <SceneLayer v-if="prevScene" :scene="prevScene" class="fading" />
 
     <!-- ② 素材位：真实场景图，文件存在即生效。
@@ -116,7 +132,7 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
       class="layer photo is-current"
       :class="{ 'is-first': firstEnter }"
       :src="currentSrc"
-      :alt="props.backdrop ?? def.name"
+      :alt="props.backdrop ?? sceneDef.name"
       @error="imageOk = false"
     />
     <img
@@ -140,7 +156,8 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  transition: filter 0.4s ease, transform 0.4s ease;
+  /* 选项进出的虚化过渡放柔，避免瞬间曝光（2026-10-17） */
+  transition: filter 0.55s ease, transform 0.55s ease;
 }
 
 /* 出选项时：场景整体虚化（放大 4% 避免模糊后露边），聚焦到抉择 */
@@ -159,9 +176,9 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
   inset: 0;
 }
 
-/* 上一场景渐变图的交叉淡出 */
+/* 幕切换时上一渐变图的交叉淡出（1.6s 缓入缓出，杜绝瞬间曝光） */
 .fading {
-  animation: scene-fade 0.95s ease forwards;
+  animation: scene-fade 1.6s ease-in-out forwards;
 }
 
 @keyframes scene-fade {
