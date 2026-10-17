@@ -19,12 +19,25 @@ const NODE_GROUPS: StoryNode[][] = [
   // chainsNodes, // 步骤 36–38（C4／两条链／EP）待审核卡点 ③ 通过后接入
 ]
 
+/** 全量节点（构建索引与顺序表共用） */
+const ALL_NODES: StoryNode[] = NODE_GROUPS.flat()
+
+// 开发期校验（RISK-6）：重复节点 id 会被 fromEntries 静默覆盖，导致剧情链路错位——
+// 构建时即暴露，避免分章录入重号后难以排查
+if (import.meta.env.DEV) {
+  const seen = new Set<string>()
+  for (const n of ALL_NODES) {
+    if (seen.has(n.id)) console.error(`[story] 重复节点 id：${n.id}，后者已覆盖前者，请检查剧本数据`)
+    seen.add(n.id)
+  }
+}
+
 export const storyNodes: Record<string, StoryNode> = Object.fromEntries(
-  NODE_GROUPS.flat().map((n) => [n.id, n])
+  ALL_NODES.map((n) => [n.id, n])
 )
 
 /** 节点播放顺序（用于进度与调试跳转） */
-export const storyOrder: string[] = NODE_GROUPS.flat().map((n) => n.id)
+export const storyOrder: string[] = ALL_NODES.map((n) => n.id)
 
 /**
  * 章节入口（V3.0 章序；调试跳转 + 回看分组依据）。

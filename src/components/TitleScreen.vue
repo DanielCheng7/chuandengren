@@ -6,7 +6,7 @@
  * 居中成排、底部一条浅色横带托底、按钮极简无框；交互沿用「点灯」语言：
  * 主行动「灯芯」常亮，悬停时灯芯线点亮（UI 设计书 r3 §4.2/§4.9）。
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import AiFish from './AiFish.vue'
 import LanternVisual from './LanternVisual.vue'
 import SettingsPanel from './SettingsPanel.vue'
@@ -14,8 +14,13 @@ import type { StoryEngine } from '@/composables/useStoryEngine'
 
 const props = defineProps<{ engine: StoryEngine }>()
 
-const hasSave = computed(() => props.engine.hasSave())
+// RISK-7 修复：改用引擎暴露的响应式 saveExists 标记（persist/loadSave/restart 时维护），
+// 不再依赖"组件重挂载才重新读 localStorage"的隐式行为
+const hasSave = computed(() => props.engine.saveExists.value)
 const showSettings = ref(false)
+
+// 进入标题页时同步一次存档标记（读取旧存档场景），此后由引擎变更自动驱动
+onMounted(() => props.engine.hasSave())
 </script>
 
 <template>

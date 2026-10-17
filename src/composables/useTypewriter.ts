@@ -61,7 +61,10 @@ export function useTypewriter(
     typing.value = false
   }
 
-  watch([text, enabled, speed], run, { immediate: true })
+  // 仅 text / enabled 变化才重启打字；speed 变化不重启——
+  // step() 每步都现读 speed.value，新速度从下一个字自然生效，
+  // 避免打字中途调速把已打内容清空重来（BUG-2 修复）
+  watch([text, enabled], run, { immediate: true })
   onUnmounted(clear)
 
   return { displayed, typing, skip }

@@ -84,10 +84,19 @@ function endpoint(): string | undefined {
   return import.meta.env.VITE_AI_ENDPOINT as string | undefined
 }
 
-function withTimeout<T>(p: Promise<T>, ms = TIMEOUT_MS): Promise<T> {
+/**
+ * 带超时的请求执行器（BUG-4 修复）：
+ * 超时通过 AbortController 真正中止底层 fetch，不再让请求在后台悬挂。
+ * task 拿到 signal，应将其传给 fetch；超时 reject AiTimeoutError。
+ */
+function withTimeout<T>(task: (signal: AbortSignal) => Promise<T>, ms = TIMEOUT_MS): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new AiTimeoutError()), ms)
-    p.then(
+    const controller = new AbortController()
+    const t = setTimeout(() => {
+      controller.abort()
+      reject(new AiTimeoutError())
+    }, ms)
+    task(controller.signal).then(
       (v) => {
         clearTimeout(t)
         resolve(v)
@@ -98,6 +107,21 @@ function withTimeout<T>(p: Promise<T>, ms = TIMEOUT_MS): Promise<T> {
       }
     )
   })
+}
+
+/** 统一的 POST 调用：非 2xx / 空文本均抛错，由调用方落到备用文本 */
+async function postAiText(url: string, body: unknown, signal: AbortSignal): Promise<string> {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!r.ok) throw new Error(`AI 接口异常：${r.status}`)
+  const data = (await r.json()) as { text?: string }
+  const out = (data.text ?? '').trim()
+  if (!out) throw new Error('AI 返回为空')
+  return out
 }
 
 /**
@@ -117,19 +141,7 @@ export async function requestAshunReply(playerAnswer: string, state: GameState):
     }),
   }
 
-  const text = await withTimeout(
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).then(async (r) => {
-      if (!r.ok) throw new Error(`AI 接口异常：${r.status}`)
-      const data = (await r.json()) as { text?: string }
-      const out = (data.text ?? '').trim()
-      if (!out) throw new Error('AI 返回为空')
-      return out
-    })
-  )
+  const text = await withTimeout((signal) => postAiText(url, body, signal))
 
   return { lines: [{ speaker: '阿鲟', text, type: 'dialogue', aiGenerated: true }], source: 'remote' }
 }
@@ -149,19 +161,7 @@ export async function requestJourneySummary(state: GameState): Promise<AiResult>
     }),
   }
 
-  const text = await withTimeout(
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).then(async (r) => {
-      if (!r.ok) throw new Error(`AI 接口异常：${r.status}`)
-      const data = (await r.json()) as { text?: string }
-      const out = (data.text ?? '').trim()
-      if (!out) throw new Error('AI 返回为空')
-      return out
-    })
-  )
+  const text = await withTimeout((signal) => postAiText(url, body, signal))
 
   return { lines: [{ text, type: 'narration', aiGenerated: true }], source: 'remote' }
 }

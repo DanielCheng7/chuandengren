@@ -102,6 +102,8 @@ export function useStoryEngine() {
   const missingNodeId = ref<string | null>(null)
   const journeySummary = ref<Line[]>([])
   const journeyLoading = ref(false)
+  /** 是否存在可继续的存档（响应式标记，标题页「继续上次」按钮用；RISK-7 修复） */
+  const saveExists = ref(false)
 
   /* ---------------- 派生状态 ---------------- */
   const node = computed<StoryNode | undefined>(() => getNode(nodeId.value))
@@ -161,6 +163,8 @@ export function useStoryEngine() {
       type: l.type ?? 'narration',
       aiGenerated: l.aiGenerated,
     })
+    // 会话内同步截断，与存档 slice(-120) 口径一致（OPT-9：防长会话内存无限增长）
+    if (history.value.length > 300) history.value.splice(0, history.value.length - 300)
   }
 
   function recordChoiceLabel(text: string) {
@@ -289,6 +293,12 @@ export function useStoryEngine() {
   function choose(choiceId: string) {
     const c = visibleChoices.value.find((x) => x.id === choiceId)
     if (!c) return
+    // 死路防护（RISK-5）：空 outcome 且无 nextNodeId 时拒绝执行——
+    // 否则 afterLines 会回落到本节点选项，玩家可重复选择、effects 被重复结算
+    if (!c.nextNodeId && filterLines(c.outcome ?? []).length === 0) {
+      console.warn(`[story] 选项 ${c.id}（${c.text}）既无 outcome 也无 nextNodeId，已拦截`)
+      return
+    }
     applyEffects(c.effects)
     applyFlags(c.setFlags)
     recordChoiceLabel(c.text)
@@ -314,16 +324,22 @@ export function useStoryEngine() {
     if (!trimmed) return
     const clipped = trimmed.slice(0, cfg.limit)
     state.freeInputs.push(clipped)
+    // 提交即记录（OPT-10）：成败都进回看，与 state.freeInputs 口径一致
+    recordChoiceLabel(`（自由输入）${clipped}`)
     freeInputDone.value = true
     aiStatus.value = 'thinking'
     phase.value = 'ai'
+    // 竞态防护（BUG-3）：记录提交时所在节点，返回时比对——
+    // 期间若 jumpTo/重新开始导致节点变化，丢弃过期结果，不污染当前剧情
+    const submitNodeId = nodeId.value
     persist()
     try {
       const res = await requestAshunReply(clipped, state)
-      recordChoiceLabel(`（自由输入）${clipped}`)
+      if (nodeId.value !== submitNodeId) return
       aiStatus.value = 'done'
       showLines(res.lines, node.value?.nextNodeId)
     } catch (err) {
+      if (nodeId.value !== submitNodeId) return
       console.warn('[ai] 回应失败', err)
       aiStatus.value = 'failed'
       if (err instanceof AiTimeoutError) {
@@ -406,6 +422,7 @@ export function useStoryEngine() {
           journeySummary: journeySummary.value,
         })
       )
+      saveExists.value = true
     } catch (e) {
       console.warn('[save] 写入失败', e)
     }
@@ -444,6 +461,7 @@ export function useStoryEngine() {
         phase.value = data.phase
         aiStatus.value = data.aiStatus ?? 'idle'
       }
+      saveExists.value = true
       return true
     } catch (e) {
       console.warn('[save] 读取失败', e)
@@ -454,10 +472,16 @@ export function useStoryEngine() {
   function hasSave(): boolean {
     try {
       const raw = localStorage.getItem(SAVE_KEY)
-      if (!raw) return false
+      if (!raw) {
+        saveExists.value = false
+        return false
+      }
       const data = JSON.parse(raw) as { nodeId?: string }
-      return !!data?.nodeId && !!getNode(data.nodeId)
+      const ok = !!data?.nodeId && !!getNode(data.nodeId)
+      saveExists.value = ok
+      return ok
     } catch {
+      saveExists.value = false
       return false
     }
   }
@@ -485,6 +509,7 @@ export function useStoryEngine() {
     missingNodeId,
     journeySummary,
     journeyLoading,
+    saveExists,
     // 操作
     startOrResume,
     startFresh,

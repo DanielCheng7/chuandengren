@@ -53,6 +53,11 @@ const showChoices = computed(() => phase.value === 'choice' && e.visibleChoices.
 const showFreeInput = computed(() => phase.value === 'input' && !!freeInputConfig.value)
 const showBreak = computed(() => phase.value === 'break')
 
+/** 任一覆盖层（回看 / 设置 / 调试面板）打开时：键盘不推进剧情（BUG-1 修复） */
+const overlayOpen = computed(
+  () => showHistory.value || showSettings.value || settings.showDevPanel
+)
+
 const lanternState = computed<'half' | 'digital' | 'lit'>(() => {
   // V3.0：序章～第三章为半成品态（工艺进行中）；C4 创新链后转数字态；
   // 'lit'（点亮态）用于结局与尾声（结局页组件自持，步骤 35–38）。
@@ -208,7 +213,7 @@ function onKeydown(ev: KeyboardEvent) {
   }
 
   if (ev.key === ' ' || ev.key === 'Enter') {
-    if (showSettings.value) return // 设置面板打开时不推进剧情
+    if (overlayOpen.value) return // 覆盖层（回看/设置/调试面板）打开时不推进剧情
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return // 交给控件自己处理
     if (hudHidden.value) {
       hudHidden.value = false
