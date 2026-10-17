@@ -25,8 +25,8 @@ onMounted(() => props.engine.hasSave())
 
 <template>
   <div class="title-screen grain">
-    <!-- 标题页背景视频（队友提供；无视频/加载失败时回落渐变背景）。
-         H.264 版为兼容性转码（原 HEVC 版在部分浏览器/GPU 不可解码，保留备用） -->
+    <!-- 标题页背景视频（队友提供的高清动画；无视频/加载失败时回落渐变背景）。
+         已转码：H.264 / 2560×1440 / 30fps / faststart（原始 2K60 高码率 11.4MB → 3.4MB，便于网页加载） -->
     <video
       v-if="videoOk"
       class="bg-video"
@@ -35,7 +35,7 @@ onMounted(() => props.engine.hasSave())
       loop
       playsinline
       aria-hidden="true"
-      src="/assets/scenes/主页面/主页面_h264.mp4"
+      src="/assets/scenes/主页面/标题页_h264.mp4"
       @error="videoOk = false"
     ></video>
     <div class="aurora" />
