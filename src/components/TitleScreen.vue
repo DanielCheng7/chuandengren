@@ -7,7 +7,6 @@
  * 主行动「灯芯」常亮，悬停时灯芯线点亮（UI 设计书 r3 §4.2/§4.9）。
  */
 import { computed, onMounted, ref } from 'vue'
-import AiFish from './AiFish.vue'
 import SettingsPanel from './SettingsPanel.vue'
 import type { StoryEngine } from '@/composables/useStoryEngine'
 
@@ -43,10 +42,8 @@ onMounted(() => props.engine.hasSave())
     <div class="scale-frame" aria-hidden="true" />
 
     <div class="stage">
-      <AiFish state="idle" :size="104" class="fish" />
-
       <h1 class="name">传灯人</h1>
-      <p class="sub">粤西·遂溪北坡游鱼（省级非遗）· 互动叙事</p>
+      <p class="sub">粤西·遂溪北坡游鱼 · 互动叙事</p>
     </div>
 
     <!-- 菜单带：横向按键排（大字 + 小字注） -->
@@ -152,31 +149,25 @@ onMounted(() => props.engine.hasSave())
   text-align: center;
 }
 
-.fish {
-  position: absolute;
-  right: 13%;
-  top: 26%;
-  opacity: 0.9;
-  pointer-events: none;
-}
-
 .name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(56px, 14vw, 88px);
+  font-size: clamp(68px, 17vw, 116px);
   font-weight: 400;
-  letter-spacing: 0.18em;
-  text-indent: 0.18em;
+  letter-spacing: 0.16em;
+  text-indent: 0.16em;
   color: var(--paper);
-  text-shadow: 0 0 30px rgba(255, 182, 92, 0.4);
+  text-shadow: 0 0 34px rgba(255, 182, 92, 0.42);
   animation: fade-in 0.9s ease both;
 }
 
 .sub {
-  margin: 8px 0 24px;
-  font-size: 16.5px;
-  letter-spacing: 0.14em;
-  color: var(--gold);
+  margin: 12px 0 24px;
+  font-family: var(--font-title);
+  font-size: clamp(20px, 2.6vw, 24px);
+  letter-spacing: 0.16em;
+  text-indent: 0.16em;
+  color: var(--paper);
   animation: fade-in 1.1s ease both;
 }
 
