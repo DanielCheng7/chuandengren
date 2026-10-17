@@ -99,7 +99,7 @@ watch(
       firstEnter.value = !had
       clearPrevTimer = window.setTimeout(() => {
         prevSrc.value = ''
-      }, 900)
+      }, 1700)
     }
     pre.onerror = () => {
       if (targetSrc() === target) imageOk.value = false
@@ -110,6 +110,17 @@ watch(
 )
 
 const showImage = computed(() => !!currentSrc.value && imageOk.value)
+
+/**
+ * 是否隐藏场景渐变底：
+ * 有真实图片（序章单屏图 / 场景素材图）且图片可用时，渐变底整体隐去——
+ * 这样从 CG 切入序幕是「黑场 → 图片渐显」，不会先透出暖色光晕
+ * （2026-10-17 用户反馈：CG→序幕不应有暖灯花光过渡）。
+ * 无图片或图片加载失败时，渐变底作为兜底正常显示。
+ */
+const hideBase = computed(
+  () => (!!props.backdrop || !!sceneDef.value.asset) && imageOk.value
+)
 </script>
 
 <template>
@@ -120,9 +131,12 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
       { dim: props.dim, 'has-photo': showImage, 'is-blurred': props.blur },
     ]"
   >
-    <!-- ① 场景渐变图：按幕基调统一（幕内不换色），幕切换时交叉淡出 -->
-    <SceneLayer :scene="schemeKey" />
-    <SceneLayer v-if="prevScene" :scene="prevScene" class="fading" />
+    <!-- ① 场景渐变图：按幕基调统一（幕内不换色），幕切换时交叉淡出。
+         有真实图片时整体隐去，让图片从黑场渐显（避免暖色光晕透出） -->
+    <div class="base" :class="{ 'is-hidden': hideBase }">
+      <SceneLayer :scene="schemeKey" />
+      <SceneLayer v-if="prevScene" :scene="prevScene" class="fading" />
+    </div>
 
     <!-- ② 素材位：真实场景图，文件存在即生效。
          双图层交叉溶解：底图（当前）不透明，渐隐层（上一张）在其上 1→0 淡出揭示新图 -->
@@ -156,8 +170,21 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  /* 黑场底色：从 CG 切入时先见纯黑，再由图片渐显（无暖色光晕闪现） */
+  background: #05080f;
   /* 选项进出的虚化过渡放柔，避免瞬间曝光（2026-10-17） */
   transition: filter 0.55s ease, transform 0.55s ease;
+}
+
+/* 渐变底层：有真实图片时隐去（黑场垫底），无图/图片失败时兜底显示 */
+.base {
+  position: absolute;
+  inset: 0;
+  transition: opacity 1.2s ease;
+}
+
+.base.is-hidden {
+  opacity: 0;
 }
 
 /* 出选项时：场景整体虚化（放大 4% 避免模糊后露边），聚焦到抉择 */
@@ -198,14 +225,14 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
   filter: saturate(0.96) brightness(0.94);
 }
 
-/* 底图：仅首图做柔和渐显；后续切换保持不透明垫底，避免与渐隐层双层半透明漏底 */
+/* 底图：仅首图做柔和渐显（1.4s）；后续切换保持不透明垫底，避免与渐隐层双层半透明漏底 */
 .photo.is-current.is-first {
-  animation: fade-in 0.9s ease both;
+  animation: fade-in 1.4s ease both;
 }
 
-/* 渐隐层：上一张图淡出，揭示下面的新图（交叉溶解） */
+/* 渐隐层：上一张图淡出（1.6s），揭示下面的新图（交叉溶解时缓入缓出，过渡更从容） */
 .photo.is-prev {
-  animation: photo-fade-out 0.9s ease forwards;
+  animation: photo-fade-out 1.6s ease-in-out forwards;
 }
 
 @keyframes photo-fade-out {
