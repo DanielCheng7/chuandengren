@@ -1,21 +1,28 @@
 /**
- * 《传灯人·游鱼》剧情数据结构定义（V3.0）
+ * 《传灯人·游鱼》剧情数据结构定义（V3.0 · r4 结局机制改造）
  *
- * 依据：《传灯人·游鱼_开发文档》v1.0 §6.2 数据模型（步骤 27 实施）
- * 文案唯一事实源：《开发文档》§2 剧情（整合自剧本 V3.0·r1/r2）
+ * 依据：《传灯人·游鱼_开发文档》v1.5 §6.2 数据模型、《结局机制设计 v2.0》
+ * 文案唯一事实源：《开发文档》§2 剧情（同步剧本 V3.0·r4）
  *
  * V3.0 变更要点（与 V2.0 体系不兼容）：
- *  - 旧变量（memory／aiTrust／handMade／hasLetter／lightingChoice／routeClue 与旧 Route 枚举）整体废弃；
- *  - 双轴判定：tradition（守旧）／innovation（创新），各 0–5、互不联动；
+ *  - 旧变量（memory／aiTrust／handMade／hasLetter／lightingChoice／routeClue）整体废弃；
+ *  - 双轴判定：tradition（守旧）／innovation（创新），各 0–6、互不联动；
  *  - 新增 Stance（表态记录）、c1Order（三错位观看顺序）、c2First、visitedNodes（必看全／解锁驱动）；
- *  - 节点类型新增 montage（序章蒙太奇）／stance（判定触点）／report（倾向报告屏）；
+ *  - 节点类型 montage（序章蒙太奇）／stance（判定触点）／report（倾向报告屏）／settle（C4-S 结算屏）；
  *  - Choice 新增 setFlags（c1Spot／c2First）／unlock／requiresVisited。
+ *
+ * r4 变更（结局机制）：
+ *  - 旧 `Route` 枚举废弃 → `Ending`（A／B／C）由双轴派生，不再由玩家点选；
+ *  - 新增 `EndingTier`（空版／温吞版／坚定版）与 `balancedEp`（「一日一篾」尾声变体）；
+ *  - 新增节点类型 `settle`（C4-S）与 `StoryNode.nextByEnding`／`nextIf`（条件跳转）。
  */
 
 /* ---------- 结构类型 ---------- */
 
-/** C4 最终链：守旧 / 创新 */
-export type Route = 'A' | 'B' | null
+/** 结局：灯还亮着 / 鱼入海 / 两条河（由 resolveEnding 派生） */
+export type Ending = 'A' | 'B' | 'C'
+/** 强度分层：空版 / 温吞版 / 坚定版（链 A、链 B 用） */
+export type EndingTier = 'empty' | 'mild' | 'firm'
 /** C1 三个错位：展柜 / 货架 / 摊位 */
 export type C1Spot = 'museum' | 'gift' | 'stall'
 /** C2 先走哪条：九婆的竹篾 / 阿禾的数字鱼 */
@@ -41,11 +48,13 @@ export type SceneKey =
   | 'city_facade'
   | 'dry_field'
 
-/** 一次表态记录（触点写入；C2-X / C3-4） */
+/** 一次表态记录（触点写入；C2-X / C3-4 / C4） */
 export interface Stance {
-  /** C2-X / C3-4 */
+  /** C2-X / C3-4 / C4 */
   nodeId: string
   source: 'preset' | 'free'
+  /** 预设标识：守 / 新 / 双（自由输入无此字段） */
+  presetKey?: 'A' | 'B' | 'C'
   /** 预设标签 or 玩家原话 */
   text: string
   /** 本次增量（-1 ~ +2） */
@@ -59,13 +68,18 @@ export interface Stance {
 /** 游戏状态（《开发文档》§6.2；不得新增未在此声明的变量） */
 export interface GameState {
   currentNodeId: string
-  /** 双轴判定：守旧值 0–5（互不联动） */
+  /** 双轴判定：守旧值 0–6（互不联动） */
   tradition: number
-  /** 双轴判定：创新值 0–5（互不联动） */
+  /** 双轴判定：创新值 0–6（互不联动） */
   innovation: number
   stances: Stance[]
-  /** C4 最终链（只由 C4 写定） */
-  route: Route
+  /* —— 派生值（由数值算出，不存玩家选择）—— */
+  /** 结局（resolveEnding 派生；进入 C4-S 时写入） */
+  ending?: Ending
+  /** 强度分层（进入结局链时写入） */
+  endingTier?: EndingTier
+  /** 是否追加「一日一篾」尾声变体 */
+  balancedEp?: boolean
   /** 三个错位的观看顺序（三个必看全） */
   c1Order: C1Spot[]
   c2First: C2Path
@@ -76,13 +90,15 @@ export interface GameState {
 }
 
 /**
- * 条件表达式（when / showIf / 结局微差）。
+ * 条件表达式（when / showIf / 分层与变体）。
  * visited：某节点已访问过（用于解锁类判断）。
  */
 export type Condition =
   | { key: 'tradition'; gte?: number; lte?: number }
   | { key: 'innovation'; gte?: number; lte?: number }
-  | { key: 'route'; eq: 'A' | 'B' }
+  | { key: 'ending'; eq: Ending }
+  | { key: 'endingTier'; eq: EndingTier }
+  | { key: 'balancedEp'; eq: boolean }
   | { key: 'visited'; has: string }
 
 export type Speaker =
@@ -130,9 +146,8 @@ export interface ChoiceEffects {
   innovation?: number
 }
 
-/** 抉择写入的结构标记（引擎据此维护 c1Order / c2First / route） */
+/** 抉择写入的结构标记（引擎据此维护 c1Order / c2First；结局不再由选项写定） */
 export interface ChoiceFlags {
-  route?: Route
   /** 本选项进入的错位（引擎据此维护 c1Order）——同时驱动「补看轮」去重 */
   c1Spot?: C1Spot
   /** C2 先走哪条（首次选择写入）——同时驱动「体验完自动解锁另一条」 */
@@ -212,11 +227,12 @@ export interface FreeInputConfig {
  *  - normal  常规线性
  *  - montage 序章蒙太奇（可跳过不可快进）
  *  - choice  抉择（选项组）
- *  - stance  判定触点（3 预设 + 自由输入）★步骤 33 接入
- *  - report  倾向报告屏（C3-R）★步骤 35 接入
+ *  - stance  判定触点（3 预设 + 自由输入）
+ *  - report  倾向报告屏（C3-R）
+ *  - settle  走向结算屏（C4-S；进入即计算 ending／endingTier／balancedEp）
  *  - ending  结局页
  */
-export type NodeKind = 'normal' | 'montage' | 'choice' | 'stance' | 'report' | 'ending'
+export type NodeKind = 'normal' | 'montage' | 'choice' | 'stance' | 'report' | 'settle' | 'ending'
 
 export interface StoryNode {
   /** 剧本节点号，如 PRO-1 / C1-4a */
@@ -247,6 +263,16 @@ export interface StoryNode {
    * 展示 `backdrop` 停留该时长后自动推进（如序章「手与刀」无字镜头）。
    */
   holdMs?: number
+  /**
+   * 按结局分派下一节点（settle 节点用）：
+   * `{ A: 'A1', B: 'B1', C: 'E1' }`——未命中的分支回落 `nextNodeId`。
+   */
+  nextByEnding?: Partial<Record<Ending, string>>
+  /**
+   * 条件跳转（先于 nextNodeId 判定）：按顺序取第一个条件成立者。
+   * 用于「一日一篾」等按数值分叉的尾声（如 `{ when: [{ key:'balancedEp', eq:true }], nodeId:'EP_BAL' }`）。
+   */
+  nextIf?: { when: Condition[]; nodeId: string }[]
   /** 幕末节点 */
   endOfAct?: boolean
   /** 编剧备注 */

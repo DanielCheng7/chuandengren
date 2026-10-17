@@ -33,11 +33,18 @@ export class AiTimeoutError extends Error {
 
 /* ---------------- 辅助 ---------------- */
 
-/** 路线显示名（双轴判定为数值；此处仅供提示词上下文与回顾使用） */
-export function routeLabelOf(state: GameState): string {
-  if (state.route === 'A') return '守旧链（留下来，把灯坊开起来）'
-  if (state.route === 'B') return '创新链（跟阿禾走，让鱼先游出去）'
-  return '未选择'
+/** 结局显示名（r4：结局由双轴派生，仅供提示词上下文与回顾使用） */
+export function endingLabelOf(state: GameState): string {
+  switch (state.ending) {
+    case 'A':
+      return '守旧链（留下来，把灯坊开起来）'
+    case 'B':
+      return '创新链（跟阿禾走，让鱼先游出去）'
+    case 'C':
+      return '合流链（灯坊与工作室都开着）'
+    default:
+      return '尚未结算'
+  }
 }
 
 /* ---------------- 提示词模板（过渡版；步骤 29 重写为判定模块） ---------------- */
@@ -49,7 +56,7 @@ export const PROMPT_ASHUN_REPLY = `你是互动叙事作品《传灯人·游鱼�
 林知遥返乡回到湛江遂溪北坡老圩，围绕一盏没扎完的鳌鱼灯（北坡游鱼，省级非遗）做毕业设计。你擅长识别结构、整理资料和生成方案，但你不能完全理解人类的记忆、承诺和情感。全剧你没有一句观点——数据由你说，判断由人物说，选择由用户做。
 
 当前上下文：
-- 玩家选择的道路：{{route}}
+- 当前走向：{{route}}
 - 玩家当前的原话：{{playerAnswer}}
 - 状态记录：{{storyContext}}
 
@@ -63,7 +70,7 @@ export const PROMPT_ASHUN_REPLY = `你是互动叙事作品《传灯人·游鱼�
 export const PROMPT_JOURNEY_SUMMARY = `你是《传灯人·游鱼》的文本助手。请基于已发生的事件，为结局页补一段克制的回顾文字。
 
 当前上下文：
-- 玩家选择的道路：{{route}}
+- 当前走向：{{route}}
 - 表态次数：{{stanceCount}}
 - 玩家表达的关键词：{{playerThemes}}
 
@@ -135,9 +142,9 @@ export async function requestAshunReply(playerAnswer: string, state: GameState):
 
   const body = {
     prompt: fillPrompt(PROMPT_ASHUN_REPLY, {
-      route: routeLabelOf(state),
+      route: endingLabelOf(state),
       playerAnswer,
-      storyContext: `守旧值 ${state.tradition}／创新值 ${state.innovation}（0–5，互不联动），已表态 ${state.stances.length} 次`,
+      storyContext: `守旧值 ${state.tradition}／创新值 ${state.innovation}（0–6，互不联动），已表态 ${state.stances.length} 次`,
     }),
   }
 
@@ -153,7 +160,7 @@ export async function requestJourneySummary(state: GameState): Promise<AiResult>
 
   const body = {
     prompt: fillPrompt(PROMPT_JOURNEY_SUMMARY, {
-      route: routeLabelOf(state),
+      route: endingLabelOf(state),
       stanceCount: String(state.stances.length),
       playerThemes: state.freeInputs.length
         ? state.freeInputs.join('；').slice(0, 60)

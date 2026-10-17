@@ -1,7 +1,7 @@
 /**
- * 剧情引擎（V3.0，《开发文档》§6.3「剧情引擎要求」）
+ * 剧情引擎（V3.0 · r4 结局机制）
  *
- * 职责：节点读取 → 条件过滤 → 应用 effects（双轴 0–5 钳制）→ 跳转
+ * 职责：节点读取 → 条件过滤 → 应用 effects（双轴 0–6 钳制）→ 跳转
  *       进度 localStorage（刷新可续）· 回看 · 重新开始 · 调试跳转
  *
  * V3.0 机制（步骤 28）：
@@ -10,8 +10,14 @@
  *    已看过的错位不再展示，剩余按玩家所选顺序续播；全部看完按 nextNodeId 汇合；
  *  - 两路体验（C2）：带 `setFlags.c2First` 的选项按目标节点访问记录去重（补看轮）；
  *  - 序章蒙太奇：`kind='montage'` 可跳过（skipMontage 沿链路走到第一个非蒙太奇节点）；
- *  - 审核透明层：stage/note 行由 `settings.showStageNotes` 控制演示／审核显示；
- *  - 触点（stance／report）与倾向报告屏待步骤 33／35 接入，本轮不涉及。
+ *  - 审核透明层：stage/note 行由 `settings.showStageNotes` 控制演示／审核显示。
+ *
+ * r4 机制（结局由数值决定）：
+ *  - `resolveEnding()`：T≥3 且 I≥3 → C《两条河》；否则 T≥I → A；否则 → B（平手归灯）；
+ *  - `resolveEndingTier()`：A 空版／温吞／坚定，B 温吞／坚定，C 不分层；
+ *  - `isBalancedEp()`：|T−I|≤1 且 T+I≥3 且非双高 → 追加「一日一篾」尾声；
+ *  - `kind='settle'`（C4-S）：进入即结算，行过滤可用 `ending／endingTier／balancedEp` 条件，
+ *    播完按 `nextByEnding` 分派到对应结局链。
  *
  * 边界：AI 只做判定；节点跳转与变量计算全部由本文件控制。
  */
@@ -20,6 +26,12 @@ import { START_NODE_ID, getNode, nodeProgress } from '@/data/story'
 import { useSettings } from '@/composables/useSettings'
 import { ASHUN_FALLBACK_LINES } from '@/data/fallbackDialogue'
 import { AiTimeoutError, requestAshunReply, requestJourneySummary } from '@/services/aiClient'
+import {
+  MAX_AXIS,
+  isBalancedEp,
+  resolveEnding,
+  resolveEndingTier,
+} from '@/utils/ending'
 import type {
   Choice,
   ChoiceEffects,
@@ -32,6 +44,9 @@ import type {
 
 const SAVE_KEY = 'chuandengren.save.v4'
 
+/** 分派器对外再导出（组件／调试面板可直接引用） */
+export { MAX_AXIS, isBalancedEp, resolveEnding, resolveEndingTier }
+
 export type Phase = 'lines' | 'choice' | 'input' | 'ai' | 'end' | 'break'
 export type AiStatus = 'idle' | 'thinking' | 'done' | 'failed'
 
@@ -43,8 +58,8 @@ export interface HistoryEntry {
   aiGenerated?: boolean
 }
 
-/** 数值统一 0–5 封顶（下限 0，负增量按 0 截断） */
-export function addScore(value: number, delta: number, max = 5): number {
+/** 数值统一 0–6 封顶（下限 0，负增量按 0 截断） */
+export function addScore(value: number, delta: number, max = MAX_AXIS): number {
   return Math.max(0, Math.min(max, value + delta))
 }
 
@@ -58,8 +73,12 @@ export function evalCondition(s: GameState, c: Condition): boolean {
       if (c.gte !== undefined && s.innovation < c.gte) return false
       if (c.lte !== undefined && s.innovation > c.lte) return false
       return true
-    case 'route':
-      return s.route === c.eq
+    case 'ending':
+      return s.ending === c.eq
+    case 'endingTier':
+      return s.endingTier === c.eq
+    case 'balancedEp':
+      return Boolean(s.balancedEp) === c.eq
     case 'visited':
       return s.visitedNodes.includes(c.has)
     default:
@@ -78,7 +97,9 @@ function createInitialState(): GameState {
     tradition: 0,
     innovation: 0,
     stances: [],
-    route: null,
+    ending: undefined,
+    endingTier: undefined,
+    balancedEp: false,
     c1Order: [],
     c2First: null,
     visitedNodes: [],
@@ -173,16 +194,28 @@ export function useStoryEngine() {
     history.value.push({ nodeId: nodeId.value, speaker: '系统', text: `［选择］${text}`, type: 'choice' })
   }
 
-  /** 双轴增量（0–5 钳制；两轴互不联动） */
+  /** 双轴增量（0–6 钳制；两轴互不联动） */
   function applyEffects(effects?: ChoiceEffects) {
     if (effects?.tradition) state.tradition = addScore(state.tradition, effects.tradition)
     if (effects?.innovation) state.innovation = addScore(state.innovation, effects.innovation)
   }
 
-  /** 结构标记：c1Spot → 维护 c1Order（观看顺序）；c2First → 仅首次写入；route → C4 写定 */
+  /**
+   * 结局结算（C4-S 进入时调用；幂等——已结算则不重算，避免调试跳转反复覆盖）。
+   * 写入 ending／endingTier／balancedEp，供行过滤与跳转使用。
+   */
+  function settleEnding(force = false) {
+    if (state.ending && !force) return
+    const t = state.tradition
+    const i = state.innovation
+    state.ending = resolveEnding(t, i)
+    state.endingTier = resolveEndingTier(state.ending, t, i)
+    state.balancedEp = isBalancedEp(t, i)
+  }
+
+  /** 结构标记：c1Spot → 维护 c1Order（观看顺序）；c2First → 仅首次写入 */
   function applyFlags(flags?: ChoiceFlags) {
     if (!flags) return
-    if (flags.route) state.route = flags.route
     if (flags.c1Spot && !state.c1Order.includes(flags.c1Spot)) state.c1Order.push(flags.c1Spot)
     if (flags.c2First && !state.c2First) state.c2First = flags.c2First
   }
@@ -225,6 +258,8 @@ export function useStoryEngine() {
     nodeId.value = id
     state.currentNodeId = id
     if (!state.visitedNodes.includes(id)) state.visitedNodes.push(id)
+    // C4-S：进入即结算，后续行过滤与跳转都依赖 ending／endingTier／balancedEp
+    if (n.kind === 'settle') settleEnding()
     freeInputDone.value = false
     aiStatus.value = 'idle'
     pendingNext.value = null
@@ -268,6 +303,15 @@ export function useStoryEngine() {
       persist()
       return
     }
+    // C4-S 走向结算屏：播完按结局分派（未命中则回落 nextNodeId）
+    if (n.kind === 'settle') {
+      const next = (state.ending && n.nextByEnding?.[state.ending]) || n.nextNodeId
+      if (next) {
+        enterNode(next)
+        return
+      }
+      console.warn(`[story] 结算节点 ${n.id} 没有匹配 ${state.ending} 的下一节点`)
+    }
     if (n.freeInput && !freeInputDone.value) {
       phase.value = 'input'
       persist()
@@ -279,6 +323,14 @@ export function useStoryEngine() {
       phase.value = 'choice'
       persist()
       return
+    }
+    // 条件跳转（如 balancedEp → EP_BAL）：先于 nextNodeId 判定
+    if (n.nextIf?.length) {
+      const hit = n.nextIf.find((b) => matchAll(state, b.when))
+      if (hit?.nodeId) {
+        enterNode(hit.nodeId)
+        return
+      }
     }
     if (n.nextNodeId) {
       enterNode(n.nextNodeId)
@@ -555,6 +607,7 @@ export function useStoryEngine() {
     jumpTo,
     skipMontage,
     hasSave,
+    settleEnding,
   }
 }
 

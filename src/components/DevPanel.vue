@@ -23,7 +23,9 @@ const linePos = computed(() => `${e.lineIndex.value + 1}/${e.lines.value.length}
 const s = computed(() => e.state)
 
 const vars = computed(() => [
-  ['route', s.value.route ?? 'null'],
+  ['ending', s.value.ending ?? '—'],
+  ['tier', s.value.endingTier ?? '—'],
+  ['balancedEp', s.value.balancedEp ? 'true' : 'false'],
   ['tradition', String(s.value.tradition)],
   ['innovation', String(s.value.innovation)],
   ['c1Order', s.value.c1Order.join('→') || '—'],

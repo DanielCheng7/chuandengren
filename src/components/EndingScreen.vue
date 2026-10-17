@@ -13,11 +13,13 @@ const props = defineProps<{ engine: StoryEngine }>()
 const e = props.engine
 
 const routeLabel = computed(() => {
-  switch (e.state.route) {
+  switch (e.state.ending) {
     case 'A':
       return '守旧链·《灯还亮着》'
     case 'B':
       return '创新链·《鱼入海》'
+    case 'C':
+      return '合流链·《两条河》'
     default:
       return '未记录'
   }
@@ -25,8 +27,9 @@ const routeLabel = computed(() => {
 
 /**
  * V3.0：全片不显示任何数值／评分／进度（《开发文档》§2.6）——结局页只呈现定性信息。
- * 注：本页将在步骤 35–38（C4 ＋ 两条链＋结局）随数据一并重做（措辞微差 / 双高彩蛋 /
- * 「体验另一条链」入口）；当前仅做 V3.0 口径对齐，保证编译与原则不违背。
+ * 注：本页将在步骤 38（三结局＋EP 三分派＋「一日一篾」变体）随数据一并重做；
+ * 当前仅做 r4 口径对齐：结局名改由 `state.ending`（A/B/C）读取，
+ * 不展示 endingTier／balancedEp 等内部标记。
  */
 const report = computed(() => [{ k: '灯路', v: routeLabel.value }])
 </script>
