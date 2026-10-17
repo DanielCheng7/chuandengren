@@ -102,6 +102,7 @@ function createInitialState(): GameState {
     balancedEp: false,
     c1Order: [],
     c2First: null,
+    appliedOnce: [],
     visitedNodes: [],
     freeInputs: [],
   }
@@ -377,7 +378,10 @@ export function useStoryEngine() {
       console.warn(`[story] 选项 ${c.id}（${c.text}）既无 outcome 也无 nextNodeId，已拦截`)
       return
     }
-    applyEffects(c.effects)
+    // 首次计分去重（r5）：C1 三错位／C2 两条路共用 onceKey，补看不重复加分
+    const scored = !c.onceKey || !state.appliedOnce.includes(c.onceKey)
+    if (c.onceKey && scored) state.appliedOnce.push(c.onceKey)
+    if (scored) applyEffects(c.effects)
     applyFlags(c.setFlags)
     recordChoiceLabel(c.text)
     showLines(c.outcome ?? [], c.nextNodeId)

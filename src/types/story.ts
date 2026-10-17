@@ -21,8 +21,8 @@
 
 /** 结局：灯还亮着 / 鱼入海 / 两条河（由 resolveEnding 派生） */
 export type Ending = 'A' | 'B' | 'C'
-/** 强度分层：空版 / 温吞版 / 坚定版（链 A、链 B 用） */
-export type EndingTier = 'empty' | 'mild' | 'firm'
+/** 强度分层：温吞版 / 坚定版（A、B、C 三个结局都分两层） */
+export type EndingTier = 'mild' | 'firm'
 /** C1 三个错位：展柜 / 货架 / 摊位 */
 export type C1Spot = 'museum' | 'gift' | 'stall'
 /** C2 先走哪条：九婆的竹篾 / 阿禾的数字鱼 */
@@ -83,6 +83,8 @@ export interface GameState {
   /** 三个错位的观看顺序（三个必看全） */
   c1Order: C1Spot[]
   c2First: C2Path
+  /** 选择组首次计分去重（C1-3 三个错位／C2-0 两条路各共用一个 onceKey） */
+  appliedOnce: string[]
   /** 驱动「必看全／解锁另一条」 */
   visitedNodes: string[]
   /** 自由输入原文（仅本地） */
@@ -169,6 +171,11 @@ export interface Choice {
   requiresVisited?: string[]
   /** 不满足则不渲染 */
   showIf?: Condition[]
+  /**
+   * 同组只计一次分：多个选项共用一个 key（如 C1-3 的 A/B/C 都用 'C1-3'）。
+   * 引擎据 `GameState.appliedOnce` 去重——顺序补看不重复加分。
+   */
+  onceKey?: string
   /** 剧本备注，审核模式显示（如选项字母 A/B/C） */
   note?: string
 }
