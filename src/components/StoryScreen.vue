@@ -24,6 +24,7 @@ import SceneCard from './SceneCard.vue'
 import SettingsPanel from './SettingsPanel.vue'
 import Watermark from './Watermark.vue'
 import { useSettings } from '@/composables/useSettings'
+import { CHAPTERS, storyNodes } from '@/data/story'
 import { AI_FALLBACK_BUTTON, AI_THINKING_TEXT } from '@/data/fallbackDialogue'
 import { getSceneTint } from '@/data/scenes'
 import type { StoryEngine } from '@/composables/useStoryEngine'
@@ -72,6 +73,14 @@ const isAiFailed = computed(() => phase.value === 'ai' && e.aiStatus.value === '
 const showChoices = computed(() => phase.value === 'choice' && e.visibleChoices.value.length > 0)
 const showFreeInput = computed(() => phase.value === 'input' && !!inputConfig.value)
 const showBreak = computed(() => phase.value === 'break')
+
+/**
+ * 断点屏的「已接入章节」按实际节点表算——不硬编码进度。
+ * 分章开发期每接入一章文案自动跟上，避免出现「已到第三章却写着第二章已数据化」这类过期说明。
+ */
+const readyChapters = computed(() =>
+  CHAPTERS.filter((c) => !!storyNodes[c.entry]).map((c) => c.title)
+)
 
 /** 任一覆盖层（回看 / 设置 / 调试面板）打开时：键盘不推进剧情（BUG-1 修复） */
 const overlayOpen = computed(
@@ -422,13 +431,13 @@ watch(phase, scheduleChoicesReady)
         </section>
 
         <section v-else-if="showBreak" class="break-panel anim-rise">
-          <h2>下一章尚未接入</h2>
+          <h2>下一节点尚未接入</h2>
           <p class="break-line">
             下一节点 <code>{{ e.missingNodeId.value }}</code> 尚未接入（分章开发中）。
           </p>
           <p class="break-note">
-            按分章开发流程，序章 PRO、第一章 C1、第二章 C2 已数据化并提交人工审核（卡点 ①②，见《审核记录》）；
-            当前断在第三章 C3 的入口。调试面板（Shift+D）可跳转各章节入口核对断点。
+            已接入：{{ readyChapters.join('、') }}。当前进度与待接入清单见《开发文档》§7.3；
+            调试面板（Shift+D）可跳转各章节入口核对剧情。
           </p>
           <div class="break-actions">
             <button class="btn btn-inline" type="button" @click="e.restart()">从头再玩一遍</button>
