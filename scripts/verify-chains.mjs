@@ -143,6 +143,52 @@ try {
       await sleep(250)
     }
   }
+  /** 推进到触点界面（input 阶段） */
+  const playToInput = async (timeout = 90000) => {
+    const t0 = Date.now()
+    while (Date.now() - t0 < timeout) {
+      const s = await snap()
+      if (s?.phase === 'input') {
+        await sleep(320)
+        return s
+      }
+      if (s?.phase === 'choice') {
+        await sleep(450)
+        await ev(`document.querySelector('.btn.choice:not([disabled])')?.click()`)
+        await sleep(450)
+        continue
+      }
+      await tap()
+      await sleep(170)
+    }
+    return null
+  }
+  /**
+   * 直奔链 C 并指定分层：跳 C3-1 → C3-4 选 C → 注入 (t,i,ending,tier) → 刷新继续。
+   * 链 C 的 (2,2) 在正常游玩里要靠 C3-4 自由输入判 0/0，实跑不稳定，这里用注入构造。
+   */
+  const runChainC = async (t, i, tier) => {
+    await freshBoot()
+    await jumpTo('C3-1')
+    await playToInput()
+    await ev(`[...document.querySelectorAll('.free-input .preset')][2]?.click()`)
+    await sleep(700)
+    await ev(`(() => {
+      const k = '${SAVE}';
+      const s = JSON.parse(localStorage.getItem(k));
+      s.state.tradition = ${t};
+      s.state.innovation = ${i};
+      s.state.ending = 'C';
+      s.state.endingTier = '${tier}';
+      localStorage.setItem(k, JSON.stringify(s));
+    })()`)
+    await send('Page.reload')
+    await sleep(2500)
+    await ev(`[...document.querySelectorAll('.menu-item')].find(x=>x.textContent.includes('继续上次'))?.click()`)
+    await sleep(1200)
+    return await playToEnd(2)
+  }
+
   /**
    * 从当前位置一路玩到结局页：**边推进边收集行文本**，遇选项／触点自动作答。
    * 顺序很重要——必须先收集当前行再推进，否则会漏掉进入结局前的那几行。
@@ -279,6 +325,36 @@ try {
     bLines.filter((t) => t.includes('屏幕是河')).join(' | ').slice(0, 40)
   )
   await shot('03-ending-b')
+
+  /* ===== 段 4：链 C 坚定版（(3,3)，含末帧双灯彩蛋）===== */
+  const cFirm = await runChainC(3, 3, 'firm')
+  check(
+    '⑧ 链 C 坚定（(3,3)）：E1「两笔账，一样重」＋结局「两头的灯火」＋结局页《灯海相连》',
+    cFirm.snap?.ending === 'C' &&
+      cFirm.snap?.tier === 'firm' &&
+      cFirm.lines.some((t) => t.includes('两笔账，一样重')) &&
+      cFirm.lines.some((t) => t.includes('走成了两头的灯火')) &&
+      !cFirm.lines.some((t) => t.includes('两条路都没走满')) &&
+      typeof cFirm.snap?.body === 'string' &&
+      cFirm.snap.body.includes('灯海相连'),
+    `ending=${cFirm.snap?.ending} tier=${cFirm.snap?.tier} 行数=${cFirm.lines.length}`
+  )
+  await shot('04-ending-c-firm')
+
+  /* ===== 段 5：链 C 温吞版（(2,2)）===== */
+  const cMild = await runChainC(2, 2, 'mild')
+  check(
+    '⑨ 链 C 温吞（(2,2)）：E1「两条路我都试了」＋结局「两条路都没走满」',
+    cMild.snap?.ending === 'C' &&
+      cMild.snap?.tier === 'mild' &&
+      cMild.lines.some((t) => t.includes('两条路我都试了，都不算深')) &&
+      cMild.lines.some((t) => t.includes('两条路都没走满，但都留着')) &&
+      !cMild.lines.some((t) => t.includes('两笔账，一样重')) &&
+      typeof cMild.snap?.body === 'string' &&
+      cMild.snap.body.includes('灯海相连'),
+    `ending=${cMild.snap?.ending} tier=${cMild.snap?.tier} 行数=${cMild.lines.length}`
+  )
+  await shot('05-ending-c-mild')
 
   check('⑦ 全程无 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 

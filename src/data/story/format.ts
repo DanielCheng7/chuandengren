@@ -25,6 +25,13 @@ export const caption = (text: string, sceneTag?: string, scriptRaw?: string): Li
 /** 剧本题注（画面／声音／舞台提示）：仅审核模式显示（settings.showStageNotes） */
 export const stage = (text: string): Line => ({ text, type: 'stage' })
 
+/** 带条件的剧本题注：如结局 C 末帧双灯彩蛋仅坚定版（审核模式可见，玩家不可见） */
+export const stageIf = (text: string, when: Condition[]): Line => ({
+  text,
+  type: 'stage',
+  when,
+})
+
 /** 旁白（第一人称叙述 / 说明句）——走底部对白框，不加名字 */
 export const nar = (text: string): Line => ({ text, type: 'narration' })
 

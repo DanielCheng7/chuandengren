@@ -12,6 +12,7 @@ import { c3Nodes } from './c3'
 import { c4Nodes } from './c4'
 import { chainANodes } from './chainA'
 import { chainBNodes } from './chainB'
+import { chainCNodes } from './chainC'
 
 /** 起始节点：序章第一屏 */
 export const START_NODE_ID = 'PRO-1a'
@@ -24,7 +25,8 @@ const NODE_GROUPS: StoryNode[][] = [
   c4Nodes,
   chainANodes,
   chainBNodes,
-  // chainsNodes, // 步骤 37–38（链 C／EP／现实篇）待接入
+  chainCNodes,
+  // chainsNodes, // 步骤 38（EP／EP-BAL／现实篇）待接入
 ]
 
 /** 全量节点（构建索引与顺序表共用） */
@@ -59,6 +61,7 @@ export const CHAPTERS: { key: string; title: string; entry: string }[] = [
   { key: 'C4', title: '最终抉择·你的手往哪里放', entry: 'C4' },
   { key: 'A', title: '链A·守旧线', entry: 'A1' },
   { key: 'B', title: '链B·创新线', entry: 'B1' },
+  { key: 'C', title: '链C·合流线', entry: 'E1' },
   { key: 'EP', title: '尾声·游鱼夜', entry: 'EP' },
 ]
 
