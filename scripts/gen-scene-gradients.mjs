@@ -5,7 +5,7 @@
  * 说明：
  *   - 色值与 src/data/scenes.ts 的 SCENES 一一对应（13 个在用 key，改色时两处同步）；
  *   - V3.0（步骤 30）：新增 museum_case／gift_shop／night_stall／studio_night／city_facade 五张；
- *     home_door／flashback 停用（旧图保留在磁盘作留档，不再重新生成）；
+ *     home_door／flashback 停用（对应 grad 图已清理，色值留档于 scenes.ts LEGACY_SCENES）；
  *   - 生成文件放在 public/assets/scenes/，可随时用设计稿同覆盖替换，代码零改动；
  *   - 合成规则与 SceneLayer.vue 的 CSS 回落一致：底部纵向渐变 + 圆形光源。
  */
