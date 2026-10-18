@@ -256,24 +256,28 @@ try {
   )
   await shot('01-c3-a-reached')
 
-  /* ⑦ C3-A → C3-R 断点屏 */
+  /* ⑦ C3-A → C3-R → C4 → 链条断点 */
   check(
-    '⑦ C3-A 播完落 C3-R 断点屏（步骤 35 待接入）',
-    !!breakHit && breakHit.missing === 'C3-R',
-    `phase=${breakHit?.phase} missing=${breakHit?.missing}`
+    '⑦ C3-R（报告）→ C4（结算）→ 落链 A 断点 A1',
+    !!breakHit &&
+      breakHit.missing === 'A1' &&
+      seq.includes('C3-R') &&
+      seq.includes('C4') &&
+      afterOf('C3-R') === 'C4',
+    `C3-R → ${afterOf('C3-R')}｜missing=${breakHit?.missing}`
   )
   await shot('02-break-screen')
 
-  /* ⑧ 回看面板按四章分组 */
+  /* ⑧ 回看面板按章分组（五章） */
   const groups = await ev(`(async () => {
     [...document.querySelectorAll('.tool')].find(b=>b.textContent.includes('回看'))?.click();
     await new Promise(r=>setTimeout(r,600));
     const t = document.body.innerText;
-    return ['序章·一盏灯的一生','第一章·灯往何处去','第二章·两条路','第三章·灯会前夜'].filter(x=>t.includes(x));
+    return ['序章·一盏灯的一生','第一章·灯往何处去','第二章·两条路','第三章·灯会前夜','最终抉择·你的手往哪里放'].filter(x=>t.includes(x));
   })()`)
   check(
-    '⑧ 回看面板四章分组齐全',
-    Array.isArray(groups) && groups.length === 4,
+    '⑧ 回看面板五章分组齐全',
+    Array.isArray(groups) && groups.length === 5,
     `${JSON.stringify(groups)}`
   )
   await shot('03-history-groups')
@@ -291,7 +295,7 @@ try {
   })()`)
   check(
     '⑨ 断点屏刷新后仍停在断点、节点号保留',
-    afterReload?.phase === 'break' && afterReload?.missing === 'C3-R',
+    afterReload?.phase === 'break' && afterReload?.missing === 'A1',
     `phase=${afterReload?.phase} missing=${afterReload?.missing}`
   )
 

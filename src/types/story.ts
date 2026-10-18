@@ -263,6 +263,32 @@ export interface FreeInputConfig {
  */
 export type NodeKind = 'normal' | 'montage' | 'choice' | 'stance' | 'report' | 'settle' | 'ending'
 
+/**
+ * 倾向报告模板（`kind:'report'`，C3-R）。
+ * s1＝C2-X 的判定、s2＝C3-4 的判定；六档句式由剧本给，引擎只做归并与填空，不调 AI 生成新句。
+ * `{s1}`／`{s2}` 处填玩家原话（预设填选项文案、自由输入填原句）。
+ */
+export interface ReportTemplates {
+  /** 两处都归「守」 */
+  bothShou: string
+  /** 两处都归「新」 */
+  bothXin: string
+  /** 两处都归「双」 */
+  bothShuang: string
+  /** 两处判定不同（含 0/0 无法归类） */
+  diff: string
+  /** 只有一处留下记录（另一处跳过） */
+  once: string
+  /** 两处都没留下记录 */
+  none: string
+}
+
+export interface ReportConfig {
+  /** 先后两处触点的节点 id：[s1, s2] */
+  stanceNodeIds: [string, string]
+  templates: ReportTemplates
+}
+
 export interface StoryNode {
   /** 剧本节点号，如 PRO-1 / C1-4a */
   id: string
@@ -275,6 +301,8 @@ export interface StoryNode {
   kind?: NodeKind
   choices?: Choice[]
   nextNodeId?: string
+  /** 倾向报告配置（kind='report' 时；引擎按 s1／s2 组合取句追加到 lines 之后） */
+  report?: ReportConfig
   /**
    * 自由输入配置（V2.0 能力保留：预设 + 自由输入界面 `FreeInput.vue` 即 §5.9 触点界面）。
    * V3.0 的两处触点（C2-X／C3-4）由 `stance` 接管时复用同一界面。

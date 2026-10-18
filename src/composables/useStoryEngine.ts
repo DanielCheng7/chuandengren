@@ -25,6 +25,7 @@ import { computed, reactive, ref } from 'vue'
 import { START_NODE_ID, getNode, nodeProgress } from '@/data/story'
 import { useSettings } from '@/composables/useSettings'
 import { ASHUN_FALLBACK_LINES } from '@/data/fallbackDialogue'
+import { buildStanceReportLine } from '@/utils/report'
 import {
   AiTimeoutError,
   requestAshunReply,
@@ -286,6 +287,26 @@ export function useStoryEngine() {
     }
   }
 
+  /**
+   * 节点的可见行（唯一入口）：
+   * 普通节点＝`filterLines(n.lines)`；报告节点（C3-R）还要按 s1／s2 组合追加报告句。
+   * **enterNode 与 loadSave 必须共用**——否则刷新恢复时动态行会丢（曾导致 C3-R 刷新后
+   * 跳过报告直接进 C4）。
+   */
+  function resolveNodeLines(n: StoryNode): Line[] {
+    if (n.kind === 'report' && n.report) {
+      return filterLines([
+        ...n.lines,
+        {
+          speaker: '阿鲟',
+          text: buildStanceReportLine(state.stances, n.report),
+          type: 'dialogue',
+        },
+      ])
+    }
+    return filterLines(n.lines)
+  }
+
   function enterNode(id: string) {
     const n = getNode(id)
     if (!n) {
@@ -305,7 +326,7 @@ export function useStoryEngine() {
     freeInputDone.value = false
     aiStatus.value = 'idle'
     pendingNext.value = null
-    lines.value = filterLines(n.lines)
+    lines.value = resolveNodeLines(n)
     lineIndex.value = 0
     phase.value = 'lines'
     recordLine()
@@ -693,7 +714,7 @@ export function useStoryEngine() {
       const n = getNode(data.nodeId)!
       // 旧存档没有 missingNodeId：从当前节点的下一步反推，断点屏才不会显示空节点号
       if (data.phase === 'break' && !missingNodeId.value) missingNodeId.value = n.nextNodeId ?? null
-      lines.value = filterLines(n.lines)
+      lines.value = resolveNodeLines(n)
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       if (data.phase === 'ai') {
         // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用判定

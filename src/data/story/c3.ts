@@ -17,7 +17,7 @@ import { nar, quote, say, stage } from './format'
 
 const CHAPTER = '第三章·灯会前夜'
 
-/** C3-A／C3-B／C3-C 的下一站（C3-R 属步骤 35，未接入时走断点屏） */
+/** C3-A／C3-B／C3-C 的下一站：倾向报告（报告屏 → C4 结算节点） */
 const NEXT = 'C3-R'
 
 export const c3Nodes: StoryNode[] = [
@@ -331,5 +331,38 @@ export const c3Nodes: StoryNode[] = [
       nar('抄完，又把它们一个字一个字敲进了电脑。'),
     ],
     nextNodeId: NEXT,
+  },
+
+  /* ============ C3-R｜倾向报告（六档取句，不调 AI） ============ */
+  {
+    id: 'C3-R',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-R｜倾向报告',
+    scene: 'banyan_night',
+    kind: 'report',
+    lines: [
+      stage('【C3-R】倾向报告（★AI：模板取句，不调 AI 生成新句）'),
+      stage(
+        '画面：阿鲟的小鱼灯在暗处缓缓漂过，烛火微微明灭，像在整理什么。竹架上的灯还没点。'
+      ),
+      stage('声音：studio_night 极轻垫底。'),
+      say('阿鲟', '记录整理完了。'),
+      say('阿鲟', '这一路——'),
+    ],
+    // s1＝触点①（C2-X，可跳过）、s2＝触点②（C3-4，不可跳过）
+    // 六档句式照录剧本 r8；`{s1}`／`{s2}` 由引擎填玩家原话（见 utils/report.ts）
+    report: {
+      stanceNodeIds: ['C2-X', 'C3-4'],
+      templates: {
+        bothShou: '你说过"先做扎实"。两次。',
+        bothXin: '你说过"先被看见"。两次。',
+        bothShuang: '你说"两条都要"。两次。',
+        diff: '你先说"{s1}"，后说"{s2}"。两次。',
+        once: '你只说过一次："{s1}"。',
+        none: '这一路，你没多说什么。我都记下了。',
+      },
+    },
+    nextNodeId: 'C4',
+    note: '阿鲟只报"你说过什么"：不评价、不预测、不给分（§3.7.2）。',
   },
 ]

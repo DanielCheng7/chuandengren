@@ -9,6 +9,7 @@ import { prologueNodes } from './prologue'
 import { c1Nodes } from './c1'
 import { c2Nodes } from './c2'
 import { c3Nodes } from './c3'
+import { c4Nodes } from './c4'
 
 /** 起始节点：序章第一屏 */
 export const START_NODE_ID = 'PRO-1a'
@@ -18,7 +19,8 @@ const NODE_GROUPS: StoryNode[][] = [
   c1Nodes,
   c2Nodes,
   c3Nodes,
-  // chainsNodes, // 步骤 35–38（C3-R／C4／三条链／EP）待接入
+  c4Nodes,
+  // chainsNodes, // 步骤 36–38（三条链／三结局／EP／现实篇）待接入
 ]
 
 /** 全量节点（构建索引与顺序表共用） */

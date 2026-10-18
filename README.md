@@ -41,8 +41,8 @@ npm run gen:scenes # 重新生成 13 张场景渐变图 grad_<key>.svg
 | 序章 | PRO-1a → PRO-6 | ✅ 已数据化（`prologue.ts`） |
 | 第一章·灯往何处去 | C1-1 → C1-5（三错位排队） | ✅ 已数据化（`c1.ts`） |
 | 第二章·两条路 | C2-0 → C2-A/B → C2-X → C2-AA/BB | ✅ 已数据化（`c2.ts`） |
-| 第三章·灯会前夜 | C3-1 → C3-8（含触点②）＋ C3-A/B/C | ✅ 已数据化（`c3.ts`，步骤 34） |
-| C4 结算节点 ＋ C3-R 倾向报告 | — | ⏳ 步骤 35 |
+| 第三章·灯会前夜 | C3-1 → C3-8（含触点②）＋ C3-A/B/C ＋ C3-R | ✅ 已数据化（`c3.ts`，步骤 34–35） |
+| C4 结算节点 | 独白按 T／I 取句 + 开春转场按落点取句 | ✅ 已数据化（`c4.ts`，步骤 35） |
 | 链 A／B／C ＋ 三结局 ＋ EP ＋ 现实篇 | — | ⏳ 步骤 36–38 |
 
 已实现：标题页、入场 CG（渐隐→黑场→播放）、序章字卡蒙太奇、剧情页、打字机、回看、设置、道具亮相、三处触点（C2-X／C3-4）、倾向节点自动分派（`T>I`／`I>T`／`T=I`）、结局页框架、调试面板（节点/变量/跳幕/审核↔演示模式）、场景与立绘的图片优先机制。
@@ -55,7 +55,9 @@ npm run gen:scenes # 重新生成 13 张场景渐变图 grad_<key>.svg
 node scripts/verify-act1.mjs     # 序章 + 第一章流程自查（18 项）
 node scripts/verify-c2.mjs       # 第二章两条路 + 触点①（6 项）
 node scripts/verify-c3.mjs       # 第三章 + 触点② + 倾向分派 + 行样式/角色/转场（19 项）
-node scripts/verify-ending.mjs   # 结局穷举（22 组可达 / 66 项）
+node scripts/verify-c4.mjs       # C3-R 六档报告 + C4 三分派/分层（11 项）
+node scripts/verify-walkthrough.mjs # 整篇真实玩家路径连通性（11 项，不跳章）
+node scripts/verify-ending.mjs   # 结局分派穷举（22 组可达 / 66 项）
 node scripts/verify-headless.mjs # 无头浏览器走查（先 npm run build && npm run preview）
 ```
 

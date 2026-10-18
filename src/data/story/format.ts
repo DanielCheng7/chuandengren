@@ -8,7 +8,7 @@
  *    审核模式可见、演示模式（默认）隐藏；
  *  - 序章蒙太奇的旁白以「中央字卡」（caption）缓慢呈现（美感宣言，可跳过不可快进）。
  */
-import type { Line, Speaker } from '@/types/story'
+import type { Condition, Line, Speaker } from '@/types/story'
 
 /**
  * 中央字卡（渐入 → 停留 → 渐隐 + 按字数自动推进，点击可跳过）。
@@ -27,6 +27,12 @@ export const stage = (text: string): Line => ({ text, type: 'stage' })
 
 /** 旁白（第一人称叙述 / 说明句）——走底部对白框，不加名字 */
 export const nar = (text: string): Line => ({ text, type: 'narration' })
+
+/**
+ * 带条件的旁白：条件成立才显示（《开发文档》§6.2 `Condition`）。
+ * 用法：结算节点按走向／分层取句（C4 的独白与"开春"转场）。
+ */
+export const narIf = (text: string, when: Condition[]): Line => ({ text, type: 'narration', when })
 
 /** 对白 —— 走底部对白框；台词「」为呈现层包装，数据不带引号 */
 export const say = (speaker: Speaker, text: string): Line => ({
