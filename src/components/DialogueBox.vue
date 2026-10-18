@@ -240,9 +240,14 @@ defineExpose({
   text-align: left;
 }
 
+/* 引用 / 字幕：衬线居中（《开发文档》§5.7 行样式族）。
+   注意：本文件 `.text` 的 `text-align:left` 特异性高于 global.css 的 `.line-quote`，
+   必须在这里显式居中，否则 C3-8 共识框架会左对齐（2026-10-18 自检修复）。 */
 .t-quote .text,
 .t-subtitle .text {
   font-size: calc(20.5px * var(--font-scale));
+  font-family: var(--font-title);
+  text-align: center;
 }
 
 /* 「块居中、行内左对齐」（2026-10-16 用户决议修订）：

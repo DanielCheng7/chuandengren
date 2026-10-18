@@ -78,6 +78,13 @@ export function evalCondition(s: GameState, c: Condition): boolean {
       if (c.gte !== undefined && s.innovation < c.gte) return false
       if (c.lte !== undefined && s.innovation > c.lte) return false
       return true
+    case 'axisDiff': {
+      // 守旧值 − 创新值：C3-8 之后据此自动进入 C3-A（>0）／C3-B（<0）／C3-C（=0）
+      const d = s.tradition - s.innovation
+      if (c.gte !== undefined && d < c.gte) return false
+      if (c.lte !== undefined && d > c.lte) return false
+      return true
+    }
     case 'ending':
       return s.ending === c.eq
     case 'endingTier':
@@ -536,10 +543,13 @@ export function useStoryEngine() {
                 // 复述原话：引号由 DialogueBox／HistoryPanel 的呈现层统一加，数据层不带（否则显示「「…」」）
                 { speaker: '阿鲟', text: clipped, type: 'dialogue' },
                 { speaker: '阿鲟', text: `记录。倾向：${dir}。`, type: 'dialogue', aiGenerated: true },
+                // 对方角色的收束台词（如 C3-4 九婆「你说的，我听着了。」）——与判定值无关
+                ...(stance.freeClose ?? []),
               ]
             : [
                 // 0/0：固定回退句（人工撰写，不标 AI）
                 { speaker: '阿鲟', text: ASHUN_FALLBACK_LINES[0].text, type: 'dialogue' },
+                ...(stance.freeClose ?? []),
               ],
           n.nextNodeId
         )
@@ -558,7 +568,11 @@ export function useStoryEngine() {
         recordStance(n.id, 'free', clipped, 0, 0, '判定失败，按 0/0 记录')
         phase.value = 'lines'
         showLines(
-          [{ speaker: '阿鲟', text: ASHUN_FALLBACK_LINES[0].text, type: 'dialogue' }],
+          [
+            { speaker: '阿鲟', text: ASHUN_FALLBACK_LINES[0].text, type: 'dialogue' },
+            // 判定失败也要接对方收束——剧情不能卡在阿鲟的失败态上
+            ...(stance.freeClose ?? []),
+          ],
           n.nextNodeId
         )
         return

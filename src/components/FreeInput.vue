@@ -69,7 +69,7 @@ function pickPreset(id: string) {
     />
 
     <button class="btn btn-gold submit" type="button" :disabled="!canSubmit" @click="submit">
-      用这句话回答阿鲟
+      {{ config.submitLabel ?? '用这句话回答阿鲟' }}
     </button>
 
     <div class="divider"><span>或者，选一个预设答案</span></div>

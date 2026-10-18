@@ -95,10 +95,12 @@ export interface GameState {
  * 条件表达式（when / showIf / 分层与变体）。
  * visited：某节点已访问过（用于解锁类判断）。
  * c1Order：第一章三个错位的"已看数量"（用于补看轮——引导语只在第一次出现）。
+ * axisDiff：守旧值 − 创新值（C3-8 之后按倾向自动进入 C3-A／B／C——剧本"不设选项"）。
  */
 export type Condition =
   | { key: 'tradition'; gte?: number; lte?: number }
   | { key: 'innovation'; gte?: number; lte?: number }
+  | { key: 'axisDiff'; gte?: number; lte?: number }
   | { key: 'ending'; eq: Ending }
   | { key: 'endingTier'; eq: EndingTier }
   | { key: 'balancedEp'; eq: boolean }
@@ -219,9 +221,17 @@ export interface StanceConfig {
   skippable?: boolean
   /** 跳过收束（如「未记录。跳过。」） */
   skipClose?: Line[]
+  /**
+   * 自由输入判定后的**对方角色**收束（r8 新增）：
+   * C3-4 判完后九婆要接一句「你说的，我听着了。」——与数值无关，接在阿鲟两行之后。
+   * 预设路径的对应台词写在 `StancePreset.close`。
+   */
+  freeClose?: Line[]
   presets: StancePreset[]
   /** AI 判定提示词模板 key（步骤 29 重写） */
   aiPromptKey: string
+  /** 提交按钮文案（缺省「用这句话回答阿鲟」；C3-4 为「用这句话回答九婆」） */
+  submitLabel?: string
 }
 
 export interface FreeInputConfig {
@@ -234,6 +244,11 @@ export interface FreeInputConfig {
   aiPromptKey: string
   /** 可跳过（C2-X 次触点；跳过入口文案「先不记录，跳过」） */
   skippable?: boolean
+  /**
+   * 提交按钮文案（缺省「用这句话回答阿鲟」）。
+   * C3-4 是回答九婆，按钮不能还写着阿鲟——按节点配置（r8 自检项）。
+   */
+  submitLabel?: string
 }
 
 /**

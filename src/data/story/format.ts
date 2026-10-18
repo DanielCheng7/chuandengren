@@ -36,6 +36,12 @@ export const say = (speaker: Speaker, text: string): Line => ({
 })
 
 /**
+ * 引用式文本（《开发文档》§5.7 行样式族）：烛光橙衬线居中、无打字机。
+ * V3.0 用法：C3-8 共识框架四行（"四行字依次亮起，像点灯"）。
+ */
+export const quote = (text: string): Line => ({ text, type: 'quote' })
+
+/**
  * 字幕（章题、结局、尾声等）：非中央字卡、不参与「按字数自动推进」。
  * 如需**页面中央渐显渐隐 + 自动推进**（如序章末「可现在，河快干了。」），请用 `caption`。
  */
