@@ -386,14 +386,8 @@ export function useStoryEngine() {
       persist()
       return
     }
-    // 报告（report）流程待步骤 35 接入：现阶段按普通节点处理。
+    // 报告（report）流程：行已在 resolveNodeLines 里按 s1／s2 追加
     if (visibleChoices.value.length > 0) {
-      // C1 三错位补看轮：只剩最后一条时**自动进入**，不再弹选项
-      // （第三次回到 C1-3 直进最后一个错位；C2 的两条路不在此列，仍让玩家点选）。
-      if (visibleChoices.value.length === 1 && visibleChoices.value[0].setFlags?.c1Spot) {
-        performChoice(visibleChoices.value[0])
-        return
-      }
       phase.value = 'choice'
       persist()
       return

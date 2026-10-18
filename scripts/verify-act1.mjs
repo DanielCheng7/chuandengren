@@ -9,7 +9,7 @@
  *   ① 标题 → 开始 → 存档 nodeId = PRO-1a（序章蒙太奇）；
  *   ② 「跳过序章」→ 直达 C1-1（跳过不计访问）；
  *   ③ C1-3 三错位排队：按 B（文创店）→ C（夜市摊）→ A（文化馆）顺序任选，
- *      每轮回到选择组选项递减（2 → 1 → 0）；全部看过自动汇合至 C1-5；
+ *      **三轮都弹选项**（3 → 2 → 1），每轮先播补看衔接语；全部看过自动汇合至 C1-5；
  *   ④ 存档 c1Order = ['gift','stall','museum']、visitedNodes 含三个错位节点与 C1-5；
  *   ⑤ C1-5 播完进入第二章 C2-0（两条路）；
  *   ⑥ 回看面板按章分组标题存在；全程无 console 报错。
@@ -256,7 +256,7 @@ try {
   await sleep(500)
   await screenshot('skip-to-c1-1')
 
-  /* ③ C1-3 三错位排队：B → C → A；引导语只第一次出现，最后一轮自动进入 */
+  /* ③ C1-3 三错位排队：B → C → A；三轮都弹选项（3 → 2 → 1），每轮带补看衔接语 */
   const order = []
   // 先推进到第一轮选项
   let n = await advanceUntilChoices()
@@ -275,7 +275,11 @@ try {
   n = await advanceUntilChoices(40000)
   check('③-2b 回到选择组（剩余 2 项）', n === 2, `choices=${n}`)
   const body2 = await evaluate(`document.body.innerText`)
-  check('③-2c 第二轮不再显示引导语', typeof body2 === 'string' && !body2.includes('先去哪一边'))
+  check(
+    '③-2c 第二轮显示补看衔接语（「剩下两处」）',
+    typeof body2 === 'string' && body2.includes('剩下两处'),
+    typeof body2 === 'string' ? body2.slice(0, 40).replace(/\n/g, ' ') : ''
+  )
   await screenshot('choice-round2')
 
   // 第二轮：选「夜市摊」→ C1-4c
@@ -286,12 +290,22 @@ try {
   await sleep(400)
   await screenshot('spot-2-C1-4c')
 
-  // 第三轮：只剩最后一条 → 自动进入 C1-4a，不再弹选项
-  const auto = await advanceUntilNode(['C1-4a'], 40000)
+  // 第三轮：只剩最后一条，**仍弹选项**（2026-10-18 用户决议），先读衔接语再点最后一项
+  n = await advanceUntilChoices(40000)
+  const body3 = await evaluate(`document.body.innerText`)
+  const lastText = await choiceTexts()
+  check(
+    '③-4 第三轮仍弹选项（剩 1 项）＋衔接语「最后一处」',
+    n === 1 && typeof body3 === 'string' && body3.includes('最后一处'),
+    `choices=${n} 末项=${JSON.stringify(lastText)}`
+  )
+  await screenshot('choice-round3')
+  await sleep(600)
+  await clickChoiceByText('文化馆')
   order.push('museum')
-  check('③-4 最后一条自动进入（第三次不弹选项，直达 C1-4a）', !!auto, auto ? `nodeId=${auto.nodeId}` : '未自动进入')
+  check('③-4b 点最后一项 → C1-4a', !!(await waitNode(['C1-4a'])))
   await sleep(400)
-  await screenshot('spot-3-C1-4a-auto')
+  await screenshot('spot-3-C1-4a')
 
   // 三个错位看完后自动汇合（c1Order 满 3）
   await advanceUntilNode(['C1-5', 'C2-0'], 40000)
