@@ -325,8 +325,10 @@ watch(phase, scheduleChoicesReady)
 
       <p v-if="settings.showStageNotes" class="scene-tag">场景底版：{{ e.sceneKey.value }}</p>
 
-      <!-- 场景旁白：画面中央字卡（渐入 → 停留 → 渐隐 → 自动推进，UI 设计书 r3 §4.6） -->
-      <SceneCard :text="sceneCardText" :line-key="sceneCardKey" />
+      <!-- 场景旁白：画面中央字卡（渐入 → 停留 → 渐隐 → 自动推进，UI 设计书 r3 §4.6）。
+           :key=chapter —— 跨幕时整块重建、旧字卡立即销毁，保证进入下一幕时上一幕
+           文字完全退场（不随 0.95s 淡出残留在新场景上；2026-10-18 用户决议） -->
+      <SceneCard :key="e.chapter.value" :text="sceneCardText" :line-key="sceneCardKey" />
 
       <!-- 道具亮相：整屏光雾 + 中央道具 + 文字（渐入 → 停留 → 渐隐 → 自动推进，UI 设计书 r4 §4.6） -->
       <ItemShowcase :line="currentItem" :text="itemText" :line-key="cardToken" />
