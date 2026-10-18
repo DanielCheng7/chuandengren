@@ -82,7 +82,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局A｜灯还亮着',
     scene: 'workshop_next_year',
-    kind: 'ending',
+    // 结局段本身不是终点：末尾字卡后进尾声 EP（《开发文档》§2.4 速查表）
     lines: [
       stage('【结局 A】《灯还亮着》'),
       stage(
@@ -106,6 +106,7 @@ export const chainANodes: StoryNode[] = [
       nar('慢，是灯的活法。'),
       card('结局一·灯还亮着。'),
     ],
+    nextNodeId: 'EP',
     note: '代价段三版互斥（T≥4／T=3／T=2）：按守旧值取一版。',
   },
 ]

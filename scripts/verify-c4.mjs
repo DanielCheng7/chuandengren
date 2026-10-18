@@ -10,7 +10,7 @@
  *   ② 链 A 温吞：T>I 且 T≤3 → 独白「留下来…」＋转场「我留了下来。」→ 断点 A1；
  *   ③ 链 B 温吞：I>T 且 I≤3 → 独白「跟阿禾走…」＋转场「我跟着阿禾去了省城。」→ 断点 B1；
  *   ④ 「双/双」档（真路径）：C1 文化馆 + C2 阿禾 + C2-X C + C3-4 C → (3,3)
- *      → 报告「你说"两条都要"。两次。」＋链 C 坚定＋转场「灯坊的门开着…」→ 链 C 结局页 END-C；
+ *      → 报告「你说"两条都要"。两次。」＋链 C 坚定＋转场「灯坊的门开着…」→ 链 C → 尾声 → 结局页 END；
  *   ⑤ 「都跳过」档（不可达组合，注入空 stances 验证）：报告「这一路，你没多说什么。」；
  *   ⑥ C4 无任何可选项、独白/转场只出现该档一句（其他档被 when 过滤）；
  *   ⑦ 全程无 console 报错。
@@ -222,8 +222,8 @@ try {
     `独白=${hasA} 转场=${hasA2} 串档=${wrongA}`
   )
   check(
-    '③ 结算落点：ending=A / tier=mild → 链 A 结局页 END-A',
-    s?.nodeId === 'END-A' && s?.ending === 'A' && s?.tier === 'mild',
+    '③ 结算落点：ending=A / tier=mild → 链 A → 尾声 → 结局页 END',
+    s?.nodeId === 'END' && s?.ending === 'A' && s?.tier === 'mild',
     `node=${s?.nodeId} ending=${s?.ending} tier=${s?.tier} missing=${s?.missing}`
   )
   await shot('02-c4-a-mild')
@@ -239,11 +239,11 @@ try {
   const c4B = await collectUntil((x) => x.phase === 'break' || x.phase === 'end')
   s = await snap()
   check(
-    '④ 链 B 温吞：独白「跟阿禾走」＋转场「我跟着阿禾去了省城」→ 链 B 结局页 END-B',
+    '④ 链 B 温吞：独白「跟阿禾走」＋转场「我跟着阿禾去了省城」→ 链 B → 尾声 → 结局页 END',
     c4B.some((t) => t.includes('跟阿禾走，让鱼先游出去')) &&
       c4B.some((t) => t.includes('开春，我跟着阿禾去了省城')) &&
       !c4B.some((t) => t.includes('我把行李搬回了灯坊')) &&
-      s?.nodeId === 'END-B' &&
+      s?.nodeId === 'END' &&
       s?.ending === 'B' &&
       s?.tier === 'mild',
     `ending=${s?.ending} tier=${s?.tier} missing=${s?.missing}`
@@ -318,10 +318,10 @@ try {
   const c4C = await collectUntil((x) => x.phase === 'break' || x.phase === 'end')
   s = await snap()
   check(
-    '⑧ 链 C 坚定（(3,3)）：独白「把灯坊与海连成一片」＋转场「灯坊的门开着」→ 链 C 结局页 END-C',
+    '⑧ 链 C 坚定（(3,3)）：独白「把灯坊与海连成一片」＋转场「灯坊的门开着」→ 链 C → 尾声 → 结局页 END',
     c4C.some((t) => t.includes('把灯坊与海连成一片')) &&
       c4C.some((t) => t.includes('开春，灯坊的门开着，工作室的灯也亮着')) &&
-      s?.nodeId === 'END-C' &&
+      s?.nodeId === 'END' &&
       s?.ending === 'C' &&
       s?.tier === 'firm',
     `node=${s?.nodeId} ending=${s?.ending} tier=${s?.tier}`

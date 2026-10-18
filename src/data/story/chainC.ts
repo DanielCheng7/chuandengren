@@ -96,7 +96,7 @@ export const chainCNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局C｜灯海相连',
     scene: 'fish_parade',
-    kind: 'ending',
+    // 结局段本身不是终点：末尾字卡后进尾声 EP
     lines: [
       stage('【结局 C】《灯海相连》'),
       stage(
@@ -115,6 +115,7 @@ export const chainCNodes: StoryNode[] = [
       narIf('两条路都没走满，但都留着。', MILD),
       card('结局三·灯海相连。'),
     ],
+    nextNodeId: 'EP',
     note: '分层：坚定 (3,3) 保留末帧双灯彩蛋与"两头的灯火"；温吞 (2,2) 只留"两条路都没走满，但都留着"。',
   },
 ]

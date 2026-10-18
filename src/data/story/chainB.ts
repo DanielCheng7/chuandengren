@@ -84,7 +84,7 @@ export const chainBNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局B｜鱼入海',
     scene: 'fish_parade',
-    kind: 'ending',
+    // 结局段本身不是终点：末尾字卡后进尾声 EP
     lines: [
       stage('【结局 B】《鱼入海》'),
       stage(
@@ -99,6 +99,7 @@ export const chainBNodes: StoryNode[] = [
       nar('还认得回家的水路。'),
       card('结局二·鱼入海。'),
     ],
+    nextNodeId: 'EP',
     note: 'B3／结局 B 的数据口径：观展 11 万／进坊 5140／常客 130（2026-10-18 拍板）。',
   },
 ]

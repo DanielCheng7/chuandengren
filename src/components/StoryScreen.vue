@@ -89,6 +89,9 @@ const overlayOpen = computed(
 
 const isMontage = computed(() => e.node.value?.kind === 'montage')
 
+/** 现实篇（EP-N1–N6）：非虚构段，允许整段跳过、直接落结局页（《开发文档》§2.4） */
+const inRealChapter = computed(() => /^EP-N/.test(e.nodeId.value))
+
 /** 纯图片镜头（序章 montage 无字屏）：对白框隐去，只留画面 */
 const isHoldShot = computed(() => {
   const n = e.node.value
@@ -109,6 +112,7 @@ const CHAPTER_SCHEME: Record<string, SceneKey> = {
   '链A·守旧线': 'workshop_next_year',
   '链B·创新线': 'studio_night',
   '链C·合流线': 'lantern_workshop',
+  '尾声·游鱼夜': 'fish_parade',
 }
 /** 未显式映射的幕：进入该幕时记录首个场景作为基调，幕内固定不变（后续章节接入也不会跳色） */
 const schemeFallback = ref<SceneKey>(e.sceneKey.value)
@@ -406,6 +410,15 @@ watch(phase, scheduleChoicesReady)
               @click="e.skipMontage()"
             >
               跳过序章
+            </button>
+            <button
+              v-if="inRealChapter"
+              class="tool touch-44 is-skip"
+              type="button"
+              title="跳过现实篇，直接看结局页"
+              @click="e.jumpTo('END')"
+            >
+              跳过现实篇
             </button>
             <button class="tool touch-44" type="button" @click="showHistory = true">回看</button>
             <button class="tool touch-44" type="button" @click="e.restart()">重新开始</button>

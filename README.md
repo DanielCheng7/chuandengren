@@ -46,9 +46,9 @@ npm run gen:scenes # 重新生成 13 张场景渐变图 grad_<key>.svg
 | 链 A《灯还亮着》 | A1 开坊 → A2 记谱 → A3 三年后 → 结局 A | ✅ 已数据化（`chainA.ts`，步骤 36） |
 | 链 B《鱼入海》 | B1 数字灯谱 → B2 鱼游城市 → B3 后续 → 结局 B | ✅ 已数据化（`chainB.ts`，步骤 36） |
 | 链 C《灯海相连》 | E1 不二选一 → E2 骨与鳞 → E3 三年后 → 结局 C | ✅ 已数据化（`chainC.ts`，步骤 37；温吞 (2,2)／坚定 (3,3)） |
-| EP ＋「一日一篾」变体 ＋ 现实篇 EP-N | EP / EP-BAL / EP-N1–N6 | ⏳ 步骤 38 |
+| EP ＋「一日一篾」变体 ＋ 现实篇 EP-N | EP（三分派共用台词，三套镜头侧重）/ EP-BAL（4 组）/ EP-N1–N6 / END | ✅ 已数据化（`ep.ts`，步骤 38） |
 
-已实现：标题页、入场 CG（渐隐→黑场→播放）、序章字卡蒙太奇、剧情页、打字机、回看、设置、道具亮相、两处触点（C2-X／C3-4）、倾向节点自动分派（`T>I`／`I>T`／`T=I`）、C3-R 倾向报告、C4 结算节点、三条结局链与三个结局页、调试面板（节点/变量/跳幕/审核↔演示模式）、场景与立绘的图片优先机制。
+已实现：**全篇主线可通关**——标题页、入场 CG、序章字卡蒙太奇、剧情页、打字机、回看、设置、道具亮相、两处触点（C2-X／C3-4）、倾向节点自动分派（`T>I`／`I>T`／`T=I`）、C3-R 倾向报告、C4 结算节点、三条结局链、尾声 EP、「一日一篾」变体、现实篇 EP-N（可跳过）、结局页、调试面板（节点/变量/跳幕/审核↔演示模式）、场景与立绘的图片优先机制。
 
 ---
 
@@ -59,7 +59,8 @@ node scripts/verify-act1.mjs     # 序章 + 第一章流程自查（18 项）
 node scripts/verify-c2.mjs       # 第二章两条路 + 触点①（6 项）
 node scripts/verify-c3.mjs       # 第三章 + 触点② + 倾向分派 + 行样式/角色/转场（19 项）
 node scripts/verify-c4.mjs       # C3-R 六档报告 + C4 三分派/分层（11 项）
-node scripts/verify-chains.mjs   # 链 A／B + 结局页（代价段两版、B3 数据口径，7 项）
+node scripts/verify-chains.mjs   # 链 A／B／C + 结局页（代价段两版、C 两档、B3 数据口径，9 项）
+node scripts/verify-ep.mjs       # 尾声 + 一日一篾 4 组 + 现实篇 + 跳过入口（8 项）
 node scripts/verify-options.mjs  # 选项穷举：C1 六种顺序 / C2 两顺序 / C2-X 四路 / C3-4 三路（16 项）
 node scripts/verify-walkthrough.mjs # 整篇真实玩家路径连通性（11 项，不跳章）
 node scripts/verify-ending.mjs   # 结局分派穷举（22 组可达 / 66 项）
