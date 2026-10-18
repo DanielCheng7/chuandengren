@@ -113,13 +113,14 @@ const showImage = computed(() => !!currentSrc.value && imageOk.value)
 
 /**
  * 是否隐藏场景渐变底：
- * 有真实图片（序章单屏图 / 场景素材图）且图片可用时，渐变底整体隐去——
- * 这样从 CG 切入序幕是「黑场 → 图片渐显」，不会先透出暖色光晕
- * （2026-10-17 用户反馈：CG→序幕不应有暖灯花光过渡）。
- * 无图片或图片加载失败时，渐变底作为兜底正常显示。
+ *  - 序章单屏图（backdrop）——按设计从黑场渐显，渐变底从一开始就隐去；
+ *  - 正片场景——**只有真实图片已经加载成功**（currentSrc 有值）才隐去渐变底。
+ *    ⚠️ 不能用 `sceneDef.asset`（那只是"声明的文件名"，素材未到位时也恒为真）：
+ *    否则每次切场景都会先黑屏、等 404 回来再 1.2s 渐显出渐变底。
+ * 无图片或加载失败时，渐变底作为兜底正常显示。
  */
 const hideBase = computed(
-  () => (!!props.backdrop || !!sceneDef.value.asset) && imageOk.value
+  () => (!!props.backdrop || !!currentSrc.value) && imageOk.value
 )
 </script>
 

@@ -135,7 +135,7 @@ export const c2Nodes: StoryNode[] = [
       presets: [
         {
           id: 'C2-X-A',
-          text: '灯得先有人会扎。先把手里的篾弯完。灯在了，人才会来。',
+          text: '灯得先有人会扎。先把手里这根篾弯完。灯在了，人才会来。',
           tradition: 2,
           innovation: 0,
           close: [say('阿鲟', '记录。倾向：先做扎实。')],

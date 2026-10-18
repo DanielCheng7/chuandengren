@@ -19,7 +19,7 @@ const routeLabel = computed(() => {
     case 'B':
       return '创新链·《鱼入海》'
     case 'C':
-      return '合流链·《两条河》'
+      return '合流链·《灯海相连》'
     default:
       return '未记录'
   }

@@ -68,7 +68,8 @@ node scripts/verify-headless.mjs # 无头浏览器走查（先 npm run build && 
 |---|---|---|---|
 | 场景（13 个 key） | 每场景一张渐变图 `grad_<key>.svg` ＋ CSS 等价渐变回落 | AI 生成 16:9 场景图 | `public/assets/scenes/bg_<key>.webp`，同名即自动生效 |
 | 人物（4 人 ＋ 群像） | 不渲染立绘，只保留名条与语气色 | AI 生成 2:3 立绘 | `public/assets/characters/char-*.webp` |
-| 阿鲟 / 鳌鱼灯 | 纯代码 SVG（`AiFish.vue` / `LanternVisual.vue`） | 可换图，也可保留 | 道具图入 `public/assets/props/` |
+| 阿鲟 | 横卧鱼灯立绘 `char-ashun.webp`（透明底、约 2:1）＋名字行小金鱼 SVG | 可整图替换 | `public/assets/characters/` |
+| 鳌鱼灯 | 纯代码 SVG（`LanternVisual.vue`） | 可换图，也可保留 | `public/assets/props/` |
 | 音频 | 全程可静音运行，开关与接口已就位 | 环境音 / 音效 /《鱼灯谣》 | `public/assets/audio/` |
 
 `SceneBackdrop.vue` 与 `CharacterLayer.vue` 都是**先尝试加载图片，404 静默回落**——素材到位只需放文件，不碰组件代码。**不使用灰块占位。**
@@ -131,9 +132,9 @@ app/
 
 ## 数据模型要点
 
-- 双轴 `tradition` / `innovation`（0–5，互不联动）＋ `stances[]` 表态记录 ＋ `route` / `c1Order` / `c2First` / `visitedNodes` / `freeInputs` / `appliedOnce`
+- 双轴 `tradition` / `innovation`（**0–6**，互不联动）＋ `stances[]` 表态记录 ＋ `c1Order` / `c2First` / `visitedNodes` / `freeInputs` / `appliedOnce`
 - 节点类型：`normal` / `montage`（序章蒙太奇）/ `choice` / `stance`（AI 判定触点）/ `report`（倾向报告）/ `settle`（C4 结算）/ `ending`
-- 选项 `Choice.effects` 改数值，`onceKey` 保证同一选择只计分一次；`unlock` 解锁另一条路，`requiresVisited` 保证三错位必看全
+- 选项 `Choice.effects` 改数值，`onceKey` 保证同一选择只计分一次；C2「体验一条自动解锁另一条」与 C1「三错位必看全」由 `visitedNodes` / `c1Order` 驱动（`unlock` / `requiresVisited` 为预留字段，当前未使用）
 - 条件统一走 `Condition`（`tradition` / `innovation` / `ending` / `endingTier` / `visited` 等）
 - 剧本的**画面／声音／舞台提示**记为 `type: 'stage'`：审核模式显示、演示模式隐藏
 - UI 默认不显示任何数值；AI 只返回严格 JSON `{tradition, innovation, evidence}`，不写剧情、不参与跳转

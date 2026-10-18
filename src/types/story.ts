@@ -94,6 +94,7 @@ export interface GameState {
 /**
  * 条件表达式（when / showIf / 分层与变体）。
  * visited：某节点已访问过（用于解锁类判断）。
+ * c1Order：第一章三个错位的"已看数量"（用于补看轮——引导语只在第一次出现）。
  */
 export type Condition =
   | { key: 'tradition'; gte?: number; lte?: number }
@@ -102,6 +103,7 @@ export type Condition =
   | { key: 'endingTier'; eq: EndingTier }
   | { key: 'balancedEp'; eq: boolean }
   | { key: 'visited'; has: string }
+  | { key: 'c1Order'; size: number }
 
 export type Speaker =
   | '旁白'

@@ -147,6 +147,17 @@ try {
     }
     return -1
   }
+  /** 点击推进，直到存档 nodeId 命中候选（用于"自动进入最后一条"等无选项链路） */
+  const advanceUntilNode = async (candidates, timeout = 40000) => {
+    const t0 = Date.now()
+    while (Date.now() - t0 < timeout) {
+      const s = await readSave()
+      if (s && candidates.includes(s.nodeId)) return s
+      await evaluate(`document.querySelector('.stage')?.click()`)
+      await sleep(220)
+    }
+    return null
+  }
   /** 取当前选项按钮文案 */
   const choiceTexts = () =>
     evaluate(
@@ -245,9 +256,8 @@ try {
   await sleep(500)
   await screenshot('skip-to-c1-1')
 
-  /* ③ C1-3 三错位排队：B → C → A */
+  /* ③ C1-3 三错位排队：B → C → A；引导语只第一次出现，最后一轮自动进入 */
   const order = []
-  let round = 0
   // 先推进到第一轮选项
   let n = await advanceUntilChoices()
   check('③-1 进入 C1-3（第一轮 3 个选项）', n === 3, `choices=${n}`)
@@ -255,31 +265,39 @@ try {
   console.log('round1:', JSON.stringify(texts1))
   await screenshot('choice-round1')
 
-  const pickOrder = ['文创店', '夜市摊', '文化馆']
-  const expectNodes = ['C1-4b', 'C1-4c', 'C1-4a']
-  const expectSpots = ['gift', 'stall', 'museum']
-  for (let i = 0; i < pickOrder.length; i++) {
-    round += 1
-    await sleep(600) // 选项就绪缓冲（300ms）+ 错峰进场
-    await clickChoiceByText(pickOrder[i])
-    order.push(expectSpots[i])
-    const reached = await waitNode([expectNodes[i]])
-    check(`③-${round + 1} 选择「${pickOrder[i]}」→ ${expectNodes[i]}`, !!reached)
-    await sleep(400)
-    await screenshot(`spot-${round}-${expectNodes[i]}`)
-    // 推进错位节点内容，直到再次出现选项组（或对第 3 轮：直接汇合）
-    const m = await advanceUntilChoices(40000)
-    if (i < 2) {
-      const expectCount = 2 - i
-      check(`③-${round + 1}b 回到选择组（剩余 ${expectCount} 项）`, m === expectCount, `choices=${m}`)
-      await screenshot(`choice-round${round + 1}`)
-    } else {
-      // 第三轮后：三错位看完 → 自动汇合 C1-5（第二章已接入，C1-5 播完会进 C2-0）
-      const st2 = await readSave()
-      const c1Full = (st2?.state?.c1Order ?? []).length === 3
-      check('③-5 三个错位看完后自动汇合（c1Order 满 3）', c1Full, `c1Order=${JSON.stringify(st2?.state?.c1Order)} nodeId=${st2?.nodeId}`)
-    }
-  }
+  // 第一轮：选「文创店」→ C1-4b
+  await sleep(600) // 选项就绪缓冲（300ms）+ 错峰进场
+  await clickChoiceByText('文创店')
+  order.push('gift')
+  check('③-2 选择「文创店」→ C1-4b', !!(await waitNode(['C1-4b'])))
+  await sleep(400)
+  await screenshot('spot-1-C1-4b')
+  n = await advanceUntilChoices(40000)
+  check('③-2b 回到选择组（剩余 2 项）', n === 2, `choices=${n}`)
+  const body2 = await evaluate(`document.body.innerText`)
+  check('③-2c 第二轮不再显示引导语', typeof body2 === 'string' && !body2.includes('先去哪一边'))
+  await screenshot('choice-round2')
+
+  // 第二轮：选「夜市摊」→ C1-4c
+  await sleep(600)
+  await clickChoiceByText('夜市摊')
+  order.push('stall')
+  check('③-3 选择「夜市摊」→ C1-4c', !!(await waitNode(['C1-4c'])))
+  await sleep(400)
+  await screenshot('spot-2-C1-4c')
+
+  // 第三轮：只剩最后一条 → 自动进入 C1-4a，不再弹选项
+  const auto = await advanceUntilNode(['C1-4a'], 40000)
+  order.push('museum')
+  check('③-4 最后一条自动进入（第三次不弹选项，直达 C1-4a）', !!auto, auto ? `nodeId=${auto.nodeId}` : '未自动进入')
+  await sleep(400)
+  await screenshot('spot-3-C1-4a-auto')
+
+  // 三个错位看完后自动汇合（c1Order 满 3）
+  await advanceUntilNode(['C1-5', 'C2-0'], 40000)
+  const st2 = await readSave()
+  const c1Full = (st2?.state?.c1Order ?? []).length === 3
+  check('③-5 三个错位看完后自动汇合（c1Order 满 3）', c1Full, `c1Order=${JSON.stringify(st2?.state?.c1Order)} nodeId=${st2?.nodeId}`)
 
   /* ④ 汇合 C1-5 并验证存档 */
   s = await waitNode(['C1-5', 'C2-0'])

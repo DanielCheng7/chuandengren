@@ -225,12 +225,22 @@ watch([phase, () => e.nodeId.value, () => e.lineIndex.value], scheduleCardAdvanc
 })
 
 /* ---------- 推进与隐藏界面 ---------- */
+/**
+ * 统一的"推进"入口：交给 DialogueBox 判断——打字中先补全本行，打完再推进。
+ * 舞台点击与 Space/Enter 都走这里，避免"点画面吞掉整行"。
+ */
+const dboxRef = ref<InstanceType<typeof DialogueBox> | null>(null)
+function tapOrAdvance() {
+  if (dboxRef.value) dboxRef.value.tap()
+  else e.advance()
+}
+
 function onStageClick() {
   if (hudHidden.value) {
     hudHidden.value = false // 隐藏态下任意点击先恢复界面，不推进剧情
     return
   }
-  if (phase.value === 'lines') e.advance()
+  if (phase.value === 'lines') tapOrAdvance()
 }
 
 function hideUi() {
@@ -267,7 +277,7 @@ function onKeydown(ev: KeyboardEvent) {
     }
     if (phase.value === 'lines') {
       ev.preventDefault()
-      e.advance()
+      tapOrAdvance()
     }
     return
   }
@@ -362,6 +372,7 @@ watch(phase, scheduleChoicesReady)
             <!-- 自由输入阶段（2026-10-16 用户决议）：对白框隐去（保留占位），
                  只留问题/输入栏/预设选项——不再残留上一轮对话 -->
             <DialogueBox
+              ref="dboxRef"
               :line="displayLine"
               :class="{ 'is-blank': !!sceneCardText || !!currentItem || showFreeInput || isHoldShot }"
               @advance="e.advance()"
@@ -414,8 +425,8 @@ watch(phase, scheduleChoicesReady)
             下一节点 <code>{{ e.missingNodeId.value }}</code> 尚未接入（分章开发中）。
           </p>
           <p class="break-note">
-            按分章开发流程，序章 PRO ＋ 第一章 C1 已交付人工审核（卡点 ①，见《审核记录》）；
-            审核通过后接入第二章。调试面板（Shift+D）可跳转各章节入口核对断点。
+            按分章开发流程，序章 PRO、第一章 C1、第二章 C2 已数据化并提交人工审核（卡点 ①②，见《审核记录》）；
+            当前断在第三章 C3 的入口。调试面板（Shift+D）可跳转各章节入口核对断点。
           </p>
           <div class="break-actions">
             <button class="btn btn-inline" type="button" @click="e.restart()">从头再玩一遍</button>

@@ -86,6 +86,8 @@ export function evalCondition(s: GameState, c: Condition): boolean {
       return Boolean(s.balancedEp) === c.eq
     case 'visited':
       return s.visitedNodes.includes(c.has)
+    case 'c1Order':
+      return s.c1Order.length === c.size
     default:
       return true
   }
@@ -358,6 +360,12 @@ export function useStoryEngine() {
     }
     // 报告（report）流程待步骤 35 接入：现阶段按普通节点处理。
     if (visibleChoices.value.length > 0) {
+      // C1 三错位补看轮：只剩最后一条时**自动进入**，不再弹选项
+      // （第三次回到 C1-3 直进最后一个错位；C2 的两条路不在此列，仍让玩家点选）。
+      if (visibleChoices.value.length === 1 && visibleChoices.value[0].setFlags?.c1Spot) {
+        performChoice(visibleChoices.value[0])
+        return
+      }
       phase.value = 'choice'
       persist()
       return
@@ -416,12 +424,8 @@ export function useStoryEngine() {
     enterNode(id)
   }
 
-  function choose(choiceId: string) {
-    // 幂等防护：选项只在 choice 阶段生效——防止连点 / 选项离场动画期间误触
-    // 导致 effects 重复结算、历史重复（纵深防御；UI 层另有 selectedId 锁 + ready 门控）
-    if (phase.value !== 'choice') return
-    const c = visibleChoices.value.find((x) => x.id === choiceId)
-    if (!c) return
+  /** 真正执行一个选项（无阶段门控；供 choose 与 C1 补看轮自动进入共用） */
+  function performChoice(c: Choice) {
     // 死路防护（RISK-5）：空 outcome 且无 nextNodeId 时拒绝执行——
     // 否则 afterLines 会回落到本节点选项，玩家可重复选择、effects 被重复结算
     if (!c.nextNodeId && filterLines(c.outcome ?? []).length === 0) {
@@ -435,6 +439,15 @@ export function useStoryEngine() {
     applyFlags(c.setFlags)
     recordChoiceLabel(c.text)
     showLines(c.outcome ?? [], c.nextNodeId)
+  }
+
+  function choose(choiceId: string) {
+    // 幂等防护：选项只在 choice 阶段生效——防止连点 / 选项离场动画期间误触
+    // 导致 effects 重复结算、历史重复（纵深防御；UI 层另有 selectedId 锁 + ready 门控）
+    if (phase.value !== 'choice') return
+    const c = visibleChoices.value.find((x) => x.id === choiceId)
+    if (!c) return
+    performChoice(c)
   }
 
   function usePreset(presetId: string) {
@@ -507,17 +520,27 @@ export function useStoryEngine() {
         state.innovation = addScore(state.innovation, judge.innovation)
         recordStance(n.id, 'free', clipped, judge.tradition, judge.innovation, judge.evidence)
         aiStatus.value = 'done'
+        // 倾向用词（§3.7.1）：只有至少一轴为正时才报倾向；
+        // 0/0（含双负）一律回固定句，绝不把"没听懂"说成"两条都要"。
         const dir =
-          judge.tradition > judge.innovation
-            ? '先做扎实'
-            : judge.innovation > judge.tradition
-              ? '先被看见'
-              : '两条都要'
+          judge.tradition > 0 && judge.innovation > 0
+            ? '两条都要'
+            : judge.tradition > 0
+              ? '先做扎实'
+              : judge.innovation > 0
+                ? '先被看见'
+                : null
         showLines(
-          [
-            { speaker: '阿鲟', text: `「${clipped}」`, type: 'dialogue', aiGenerated: true },
-            { speaker: '阿鲟', text: `记录。倾向：${dir}。`, type: 'dialogue', aiGenerated: true },
-          ],
+          dir
+            ? [
+                // 复述原话：引号由 DialogueBox／HistoryPanel 的呈现层统一加，数据层不带（否则显示「「…」」）
+                { speaker: '阿鲟', text: clipped, type: 'dialogue' },
+                { speaker: '阿鲟', text: `记录。倾向：${dir}。`, type: 'dialogue', aiGenerated: true },
+              ]
+            : [
+                // 0/0：固定回退句（人工撰写，不标 AI）
+                { speaker: '阿鲟', text: ASHUN_FALLBACK_LINES[0].text, type: 'dialogue' },
+              ],
           n.nextNodeId
         )
         return
@@ -535,7 +558,7 @@ export function useStoryEngine() {
         recordStance(n.id, 'free', clipped, 0, 0, '判定失败，按 0/0 记录')
         phase.value = 'lines'
         showLines(
-          [{ speaker: '阿鲟', text: '……我记下了。', type: 'dialogue', aiGenerated: true }],
+          [{ speaker: '阿鲟', text: ASHUN_FALLBACK_LINES[0].text, type: 'dialogue' }],
           n.nextNodeId
         )
         return
@@ -613,6 +636,8 @@ export function useStoryEngine() {
         JSON.stringify({
           state,
           nodeId: nodeId.value,
+          /** 断点屏（下一章未接入）要显示节点号；不存的话刷新后就成了"下一节点 （空）" */
+          missingNodeId: missingNodeId.value,
           lineIndex: lineIndex.value,
           // 'ai' 为瞬时状态，恢复时交给玩家重新选择：显示「使用备用判定」
           phase: phase.value === 'ai' ? 'ai' : phase.value,
@@ -635,6 +660,7 @@ export function useStoryEngine() {
       const data = JSON.parse(raw) as {
         state: GameState
         nodeId: string
+        missingNodeId?: string | null
         lineIndex: number
         phase: Phase
         history: HistoryEntry[]
@@ -645,11 +671,14 @@ export function useStoryEngine() {
       if (!data?.nodeId || !getNode(data.nodeId)) return false
       Object.assign(state, createInitialState(), data.state)
       nodeId.value = data.nodeId
+      missingNodeId.value = data.missingNodeId ?? null
       history.value = data.history ?? []
       freeInputDone.value = data.freeInputDone ?? false
       journeySummary.value = data.journeySummary ?? []
       started.value = true
       const n = getNode(data.nodeId)!
+      // 旧存档没有 missingNodeId：从当前节点的下一步反推，断点屏才不会显示空节点号
+      if (data.phase === 'break' && !missingNodeId.value) missingNodeId.value = n.nextNodeId ?? null
       lines.value = filterLines(n.lines)
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       if (data.phase === 'ai') {

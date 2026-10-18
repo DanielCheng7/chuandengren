@@ -62,6 +62,16 @@ function onClick() {
   }
   emit('advance')
 }
+
+/**
+ * 供父级（舞台点击 / 空格）调用：正在打字 → 先补全本行；已打完 → 推进。
+ * 修正此前「点画面直接跳下一行、当前行后半句被吞掉」的问题。
+ */
+defineExpose({
+  tap() {
+    onClick()
+  },
+})
 </script>
 
 <template>
@@ -71,21 +81,6 @@ function onClick() {
     <div class="name-row" :class="showSpeaker ? `sp-${tone}` : 'is-empty'">
       <template v-if="showSpeaker">
         <span class="name">【{{ speaker }}】</span>
-        <!-- 阿鲟：名字行右侧的标志性金色鱼图案（UI 设计书 r3 §4.5） -->
-        <svg
-          v-if="speaker === '阿鲟'"
-          class="fish-ico"
-          viewBox="0 0 128 84"
-          aria-hidden="true"
-        >
-          <g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round">
-            <path
-              d="M12 42C24 24 56 17 78 27c12 5.5 20 11 25 15-5 4-13 9.5-25 15-22 10-54 3-66-15Z"
-            />
-            <path d="M103 42c5-8 11-13 16-15-4 8-4 22 0 30-5-2-11-7-16-15Z" />
-          </g>
-          <circle cx="27" cy="39" r="5" fill="currentColor" />
-        </svg>
         <span v-if="line?.aiGenerated" class="ai-badge">AI 生成</span>
       </template>
     </div>
@@ -157,15 +152,6 @@ function onClick() {
   font-weight: 600;
   letter-spacing: 0.1em;
   white-space: nowrap;
-}
-
-/* 阿鲟的金色鱼图案：名字行右侧，与名字同色（暖金） */
-.fish-ico {
-  width: 26px;
-  height: auto;
-  flex: none;
-  color: var(--gold);
-  opacity: 0.95;
 }
 
 .sp-gold .name {

@@ -41,7 +41,7 @@ export function endingLabelOf(state: GameState): string {
     case 'B':
       return '创新链（跟阿禾走，让鱼先游出去）'
     case 'C':
-      return '合流链（灯坊与工作室都开着）'
+      return '合流链《灯海相连》（灯坊与工作室都开着）'
     default:
       return '尚未结算'
   }

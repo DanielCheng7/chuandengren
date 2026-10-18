@@ -22,7 +22,7 @@ export const CHARACTERS: Record<string, CharacterDef> = {
   九婆: { name: '九婆', asset: 'char-jiupo.webp', tone: 'paper' },
   阿禾: { name: '阿禾', asset: 'char-ahe.webp', tone: 'bamboo' },
   周经理: { name: '周经理', asset: 'char-zhou.webp', tone: 'seal' },
-  阿鲟: { name: '阿鲟', tone: 'gold' }, // 非人形角色，由 AiFish 组件承担
+  阿鲟: { name: '阿鲟', asset: 'char-ashun.webp', tone: 'gold' }, // 鱼灯本体立绘（photo/阿鲟 透明 PNG 转 webp）；名字行的小金鱼图标仍由 AiFish SVG 承担
 }
 
 export function getCharacter(speaker?: string): CharacterDef | undefined {
