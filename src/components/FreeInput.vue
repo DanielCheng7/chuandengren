@@ -12,10 +12,11 @@
 import { computed, ref } from 'vue'
 import type { FreeInputConfig } from '@/types/story'
 
-const props = defineProps<{ config: FreeInputConfig }>()
+const props = defineProps<{ config: FreeInputConfig; skippable?: boolean }>()
 const emit = defineEmits<{
   (e: 'preset', id: string): void
   (e: 'submit', text: string): void
+  (e: 'skip'): void
 }>()
 
 const value = ref('')
@@ -85,6 +86,11 @@ function pickPreset(id: string) {
         <span class="label">{{ p.text }}</span>
       </button>
     </div>
+
+    <!-- 可跳过（仅 C2-X 次触点）：幽灵文字键，低调不抢主要行动 -->
+    <button v-if="skippable" class="skip" type="button" @click="emit('skip')">
+      先不记录，跳过
+    </button>
   </div>
 </template>
 
@@ -240,6 +246,31 @@ function pickPreset(id: string) {
   100% {
     filter: brightness(1);
   }
+}
+
+/* 「先不记录，跳过」：幽灵文字键（仅 C2-X 次触点） */
+.skip {
+  justify-self: center;
+  margin-top: 6px;
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  font-family: var(--font-title);
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  color: rgba(245, 239, 226, 0.45);
+  cursor: pointer;
+  transition: color 0.22s ease;
+}
+
+.skip:hover {
+  color: rgba(245, 239, 226, 0.8);
+}
+
+.skip:focus-visible {
+  outline: 2px solid rgba(232, 163, 61, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .preset .label {

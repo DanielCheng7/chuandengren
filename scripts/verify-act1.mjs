@@ -11,7 +11,7 @@
  *   ③ C1-3 三错位排队：按 B（文创店）→ C（夜市摊）→ A（文化馆）顺序任选，
  *      每轮回到选择组选项递减（2 → 1 → 0）；全部看过自动汇合至 C1-5；
  *   ④ 存档 c1Order = ['gift','stall','museum']、visitedNodes 含三个错位节点与 C1-5；
- *   ⑤ C1-5 播完进入第二章断点（C2-0 未接入 → 幕间面板）；
+ *   ⑤ C1-5 播完进入第二章 C2-0（两条路）；
  *   ⑥ 回看面板按章分组标题存在；全程无 console 报错。
  * 截图输出到 outDir（默认 .verify-act1/），按序号命名。
  */
@@ -274,13 +274,15 @@ try {
       check(`③-${round + 1}b 回到选择组（剩余 ${expectCount} 项）`, m === expectCount, `choices=${m}`)
       await screenshot(`choice-round${round + 1}`)
     } else {
-      // 第三轮后：无剩余选项 → 自动汇合 C1-5（等待出现即视为通过，m 为 -1）
-      check('③-5 三个错位看完后选择组无剩余选项（自动汇合）', m === -1, `choices=${m}`)
+      // 第三轮后：三错位看完 → 自动汇合 C1-5（第二章已接入，C1-5 播完会进 C2-0）
+      const st2 = await readSave()
+      const c1Full = (st2?.state?.c1Order ?? []).length === 3
+      check('③-5 三个错位看完后自动汇合（c1Order 满 3）', c1Full, `c1Order=${JSON.stringify(st2?.state?.c1Order)} nodeId=${st2?.nodeId}`)
     }
   }
 
   /* ④ 汇合 C1-5 并验证存档 */
-  s = await waitNode(['C1-5'])
+  s = await waitNode(['C1-5', 'C2-0'])
   check('④-1 汇合至 C1-5（困境收束）', !!s, s ? `nodeId=${s.nodeId}` : '未到达')
   await sleep(600)
   await screenshot('c1-5')
@@ -299,18 +301,21 @@ try {
     )
   }
 
-  /* ⑤ 推进到第二章断点 */
+  /* ⑤ C1-5 播完进入第二章 C2-0（第二章已接入） */
+  let reachedC2 = false
   for (let i = 0; i < 160; i++) {
-    const brk = await evaluate(`!!document.querySelector('.break-panel')`)
-    if (brk === true) break
+    const s = await readSave()
+    if (s && s.nodeId === 'C2-0') {
+      reachedC2 = true
+      break
+    }
+    if ((await evaluate(`!!document.querySelector('.break-panel')`)) === true) break
     await evaluate(`document.querySelector('.stage')?.click()`)
     await sleep(200)
   }
-  const brkCode = await evaluate(
-    `document.querySelector('.break-panel code')?.textContent?.trim() || null`
-  )
-  check('⑤ C1-5 播完进入第二章断点（C2-0 未接入）', brkCode === 'C2-0', `break=${brkCode}`)
-  await screenshot('break-c2')
+  const atC2 = await readSave()
+  check('⑤ C1-5 播完进入第二章 C2-0（两条路）', reachedC2, `nodeId=${atC2?.nodeId}`)
+  await screenshot('c2-0-entry')
 
   /* ⑥ 回看面板：按章分组 */
   await evaluate(

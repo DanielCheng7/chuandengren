@@ -27,7 +27,7 @@ import { useSettings } from '@/composables/useSettings'
 import { AI_FALLBACK_BUTTON, AI_THINKING_TEXT } from '@/data/fallbackDialogue'
 import { getSceneTint } from '@/data/scenes'
 import type { StoryEngine } from '@/composables/useStoryEngine'
-import type { Line, SceneKey } from '@/types/story'
+import type { FreeInputConfig, Line, SceneKey } from '@/types/story'
 
 const props = defineProps<{ engine: StoryEngine }>()
 const { settings } = useSettings()
@@ -45,11 +45,31 @@ const displayLine = computed<Line | null>(() => {
   const list = e.lines.value
   return list[list.length - 1] ?? null
 })
-const freeInputConfig = computed(() => e.node.value?.freeInput ?? null)
+/**
+ * 输入界面配置：普通自由输入 或 判定触点（stance）——统一适配成 FreeInput 所需形状。
+ * 触点复用同一界面（3 预设 + 自由输入 + 可跳过，UI 设计书 §5.9）。
+ */
+const inputConfig = computed<FreeInputConfig | null>(() => {
+  const n = e.node.value
+  if (!n) return null
+  if (n.freeInput) return n.freeInput
+  if (n.stance) {
+    const s = n.stance
+    return {
+      question: s.question,
+      placeholder: s.placeholder,
+      limit: s.limit,
+      presets: s.presets.map((p) => ({ id: p.id, text: p.text, response: [] })),
+      aiPromptKey: s.aiPromptKey,
+      skippable: s.skippable,
+    }
+  }
+  return null
+})
 const showAiPanel = computed(() => phase.value === 'ai')
 const isAiFailed = computed(() => phase.value === 'ai' && e.aiStatus.value === 'failed')
 const showChoices = computed(() => phase.value === 'choice' && e.visibleChoices.value.length > 0)
-const showFreeInput = computed(() => phase.value === 'input' && !!freeInputConfig.value)
+const showFreeInput = computed(() => phase.value === 'input' && !!inputConfig.value)
 const showBreak = computed(() => phase.value === 'break')
 
 /** 任一覆盖层（回看 / 设置 / 调试面板）打开时：键盘不推进剧情（BUG-1 修复） */
@@ -73,6 +93,7 @@ const isHoldShot = computed(() => {
 const CHAPTER_SCHEME: Record<string, SceneKey> = {
   '序章·一盏灯的一生': 'dry_field',
   '第一章·灯往何处去': 'laoxu_street',
+  '第二章·两条路': 'lantern_workshop',
 }
 /** 未显式映射的幕：进入该幕时记录首个场景作为基调，幕内固定不变（后续章节接入也不会跳色） */
 const schemeFallback = ref<SceneKey>(e.sceneKey.value)
@@ -312,12 +333,14 @@ watch(phase, scheduleChoicesReady)
       <!-- 自由输入：整体置于**窗口中央**（覆盖整个画幅，2026-10-16 用户决议终版）——
            问题 + 输入栏 + 提交 + 预设一屏完整呈现，**不滚动**；进出带柔和过渡（防闪屏） -->
       <Transition name="layer">
-        <div v-if="showFreeInput && freeInputConfig" class="input-layer">
+        <div v-if="showFreeInput && inputConfig" class="input-layer">
           <div class="input-inner">
             <FreeInput
-              :config="freeInputConfig"
+              :config="inputConfig"
+              :skippable="!!e.node.value?.stance?.skippable"
               @preset="e.usePreset($event)"
               @submit="e.submitFreeInput($event)"
+              @skip="e.skipStance()"
             />
           </div>
         </div>

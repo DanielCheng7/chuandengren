@@ -7,6 +7,7 @@
 import type { StoryNode } from '@/types/story'
 import { prologueNodes } from './prologue'
 import { c1Nodes } from './c1'
+import { c2Nodes } from './c2'
 
 /** 起始节点：序章第一屏 */
 export const START_NODE_ID = 'PRO-1a'
@@ -14,9 +15,9 @@ export const START_NODE_ID = 'PRO-1a'
 const NODE_GROUPS: StoryNode[][] = [
   prologueNodes,
   c1Nodes,
-  // c2Nodes,  // 步骤 33（第二章数据化）待审核卡点 ① 通过后接入
-  // c3Nodes,  // 步骤 34（第三章数据化）待审核卡点 ② 通过后接入
-  // chainsNodes, // 步骤 36–38（C4／两条链／EP）待审核卡点 ③ 通过后接入
+  c2Nodes,
+  // c3Nodes,  // 步骤 34（第三章数据化）待接入
+  // chainsNodes, // 步骤 36–38（C4／两条链／EP）待接入
 ]
 
 /** 全量节点（构建索引与顺序表共用） */

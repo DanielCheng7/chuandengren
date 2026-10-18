@@ -25,7 +25,12 @@ import { computed, reactive, ref } from 'vue'
 import { START_NODE_ID, getNode, nodeProgress } from '@/data/story'
 import { useSettings } from '@/composables/useSettings'
 import { ASHUN_FALLBACK_LINES } from '@/data/fallbackDialogue'
-import { AiTimeoutError, requestAshunReply, requestJourneySummary } from '@/services/aiClient'
+import {
+  AiTimeoutError,
+  requestAshunReply,
+  requestJourneySummary,
+  requestStanceJudgement,
+} from '@/services/aiClient'
 import {
   MAX_AXIS,
   isBalancedEp,
@@ -200,6 +205,28 @@ export function useStoryEngine() {
     history.value.push({ nodeId: nodeId.value, speaker: '系统', text: `［选择］${text}`, type: 'choice' })
   }
 
+  /** 记录一次表态（触点）：写入 stances，供倾向报告与结局结算使用 */
+  function recordStance(
+    nid: string,
+    source: 'preset' | 'free',
+    text: string,
+    tradition: number,
+    innovation: number,
+    evidence?: string,
+    presetKey?: 'A' | 'B' | 'C'
+  ) {
+    state.stances.push({
+      nodeId: nid,
+      source,
+      presetKey,
+      text,
+      tradition,
+      innovation,
+      evidence,
+      resolved: true,
+    })
+  }
+
   /** 双轴增量（0–6 钳制；两轴互不联动） */
   function applyEffects(effects?: ChoiceEffects) {
     if (effects?.tradition) state.tradition = addScore(state.tradition, effects.tradition)
@@ -318,13 +345,18 @@ export function useStoryEngine() {
       }
       console.warn(`[story] 结算节点 ${n.id} 没有匹配 ${state.ending} 的下一节点`)
     }
+    // 触点（stance）：行播完进入「3 预设 + 自由输入」界面（可否跳过由节点配置决定）
+    if (n.kind === 'stance' && n.stance && !freeInputDone.value) {
+      phase.value = 'input'
+      persist()
+      return
+    }
     if (n.freeInput && !freeInputDone.value) {
       phase.value = 'input'
       persist()
       return
     }
-    // 触点（stance）／报告（report）流程待步骤 33／35 接入：
-    // 现阶段二者均按普通节点处理（有选项走选项、有下一节点走下一节点）。
+    // 报告（report）流程待步骤 35 接入：现阶段按普通节点处理。
     if (visibleChoices.value.length > 0) {
       phase.value = 'choice'
       persist()
@@ -408,25 +440,54 @@ export function useStoryEngine() {
   function usePreset(presetId: string) {
     // 幂等防护：预设只在自由输入阶段有效（防连点重复结算）
     if (phase.value !== 'input') return
-    const cfg = node.value?.freeInput
+    const n = node.value
+    if (!n) return
+    // 触点（C2-X／C3-4）：预设走固定判定（不调 AI），播收束台词后按 preset.nextNodeId 或节点 nextNodeId 跳转
+    if (n.stance) {
+      const p = n.stance.presets.find((x) => x.id === presetId)
+      if (!p) return
+      freeInputDone.value = true
+      state.tradition = addScore(state.tradition, p.tradition)
+      state.innovation = addScore(state.innovation, p.innovation)
+      const key = p.id.slice(-1) as 'A' | 'B' | 'C'
+      recordStance(n.id, 'preset', p.text, p.tradition, p.innovation, undefined, key)
+      recordChoiceLabel(p.text)
+      showLines(p.close, p.nextNodeId ?? n.nextNodeId)
+      return
+    }
+    const cfg = n.freeInput
     if (!cfg) return
     const p = cfg.presets.find((x) => x.id === presetId)
     if (!p) return
     freeInputDone.value = true
     applyEffects(p.effects)
     recordChoiceLabel(p.text)
-    showLines(p.response, node.value?.nextNodeId)
+    showLines(p.response, n.nextNodeId)
   }
 
-  /** 自由输入 → AI（判定层重写见步骤 29；现阶段沿用回应式 mock，保持可运行） */
+  /** 触点①：跳过表态（仅 skippable 节点可用）——不记录、不加减值，播「未记录。跳过。」后继续 */
+  function skipStance() {
+    if (phase.value !== 'input') return
+    const n = node.value
+    if (!n?.stance?.skippable) return
+    freeInputDone.value = true
+    recordChoiceLabel('（跳过表态）')
+    showLines(n.stance.skipClose ?? [], n.nextNodeId)
+  }
+
+  /** 自由输入 → AI：触点走双轴判定（只返回增量，不写剧情文本）；普通输入沿用回应式 mock */
   async function submitFreeInput(text: string) {
     // 幂等防护：仅在等待输入时接受提交（防连点重复请求 / 重复计入 freeInputs）
     if (phase.value !== 'input') return
-    const cfg = node.value?.freeInput
-    if (!cfg) return
+    const n = node.value
+    if (!n) return
+    const cfg = n.freeInput
+    const stance = n.stance
+    if (!cfg && !stance) return
+    const limit = stance ? stance.limit : cfg!.limit
     const trimmed = text.trim()
     if (!trimmed) return
-    const clipped = trimmed.slice(0, cfg.limit)
+    const clipped = trimmed.slice(0, limit)
     state.freeInputs.push(clipped)
     // 提交即记录（OPT-10）：成败都进回看，与 state.freeInputs 口径一致
     recordChoiceLabel(`（自由输入）${clipped}`)
@@ -438,14 +499,47 @@ export function useStoryEngine() {
     const submitNodeId = nodeId.value
     persist()
     try {
+      if (stance) {
+        // 触点①：双轴判定（合法值域 ±1；失败/非法一律 0/0，见《开发文档》§3.7）
+        const judge = await requestStanceJudgement(clipped, state)
+        if (nodeId.value !== submitNodeId) return
+        state.tradition = addScore(state.tradition, judge.tradition)
+        state.innovation = addScore(state.innovation, judge.innovation)
+        recordStance(n.id, 'free', clipped, judge.tradition, judge.innovation, judge.evidence)
+        aiStatus.value = 'done'
+        const dir =
+          judge.tradition > judge.innovation
+            ? '先做扎实'
+            : judge.innovation > judge.tradition
+              ? '先被看见'
+              : '两条都要'
+        showLines(
+          [
+            { speaker: '阿鲟', text: `「${clipped}」`, type: 'dialogue', aiGenerated: true },
+            { speaker: '阿鲟', text: `记录。倾向：${dir}。`, type: 'dialogue', aiGenerated: true },
+          ],
+          n.nextNodeId
+        )
+        return
+      }
       const res = await requestAshunReply(clipped, state)
       if (nodeId.value !== submitNodeId) return
       aiStatus.value = 'done'
-      showLines(res.lines, node.value?.nextNodeId)
+      showLines(res.lines, n.nextNodeId)
     } catch (err) {
       if (nodeId.value !== submitNodeId) return
-      console.warn('[ai] 回应失败', err)
+      console.warn('[ai] 判定/回应失败', err)
       aiStatus.value = 'failed'
+      if (stance) {
+        // 触点判定失败：按 0/0 记录并继续，不阻断剧情（避免玩家卡死在输入界面）
+        recordStance(n.id, 'free', clipped, 0, 0, '判定失败，按 0/0 记录')
+        phase.value = 'lines'
+        showLines(
+          [{ speaker: '阿鲟', text: '……我记下了。', type: 'dialogue', aiGenerated: true }],
+          n.nextNodeId
+        )
+        return
+      }
       if (err instanceof AiTimeoutError) {
         // 界面显示「阿鲟正在整理思路……」+「使用备用判定」
       }
@@ -625,6 +719,7 @@ export function useStoryEngine() {
     choose,
     usePreset,
     submitFreeInput,
+    skipStance,
     useFallbackReply,
     jumpTo,
     skipMontage,

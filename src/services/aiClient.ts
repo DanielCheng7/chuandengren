@@ -173,6 +173,95 @@ export async function requestJourneySummary(state: GameState): Promise<AiResult>
   return { lines: [{ text, type: 'narration', aiGenerated: true }], source: 'remote' }
 }
 
+/* ---------------- 触点双轴判定（C2-X 次触点 / C3-4 主触点） ---------------- */
+
+/** 双轴判定结果：只给增量与依据，不写剧情文本（《开发文档》§3.7） */
+export interface StanceJudgement {
+  /** 守旧增量（-1 | 0 | 1） */
+  tradition: number
+  /** 创新增量（-1 | 0 | 1） */
+  innovation: number
+  evidence?: string
+}
+
+export const PROMPT_STANCE_JUDGE = `你是互动叙事作品《传灯人·游鱼》的判定模块。你只做一件事：判断玩家这句话，在"非遗传承该先做什么"上更倾向哪一侧。
+
+当前上下文：
+- 玩家原话：{{playerAnswer}}
+- 状态记录：{{storyContext}}
+
+判定规则：
+1. 两轴独立判定，不此消彼长（可以同时为正、也可以都为 0）。
+2. 只有倾向明确时才给 ±1；含糊、两头都说、跑题，一律给 0。
+3. 不评价玩家、不给建议、不写剧情。
+
+严格只输出一行 JSON，不要解释、不要 markdown 代码块：
+{"tradition": -1|0|1, "innovation": -1|0|1, "evidence": "不超过 20 字的依据"}`
+
+function clampJudge(n: unknown): number {
+  const v = typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : 0
+  return Math.max(-1, Math.min(1, v))
+}
+
+/** 严格 JSON 解析（容忍 ```json 包裹；非法一律 0/0） */
+function parseJudge(text: string): StanceJudgement {
+  const s = text
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
+  const m = /\{[\s\S]*\}/.exec(s)
+  if (!m) return { tradition: 0, innovation: 0 }
+  try {
+    const o = JSON.parse(m[0]) as { tradition?: unknown; innovation?: unknown; evidence?: unknown }
+    return {
+      tradition: clampJudge(o.tradition),
+      innovation: clampJudge(o.innovation),
+      evidence: typeof o.evidence === 'string' ? o.evidence.slice(0, 40) : undefined,
+    }
+  } catch {
+    return { tradition: 0, innovation: 0 }
+  }
+}
+
+/** mock 判定：关键词粗判（无服务端代理时的过渡实现；倾向不明显一律 0/0，避免误判） */
+function mockStanceJudge(answer: string): StanceJudgement {
+  const keep = (answer.match(/扎|篾|手|骨|手艺|工序|学|练|打磨|扎实|基本功|沉|慢|细/g) ?? [])
+    .length
+  const innovate = (
+    answer.match(/看见|传播|视频|拍|分享|市场|年轻|更多人|流量|曝光|推广|平台|屏幕/g) ?? []
+  ).length
+  const diff = keep - innovate
+  if (diff >= 2) return { tradition: 1, innovation: 0, evidence: '提到手艺／工序与沉下心' }
+  if (diff <= -2) return { tradition: 0, innovation: 1, evidence: '提到传播／被看见与平台' }
+  if (keep >= 1 && innovate >= 1) return { tradition: 1, innovation: 1, evidence: '两条都提到' }
+  return { tradition: 0, innovation: 0 }
+}
+
+/**
+ * 触点判定入口：有服务端代理则请求严格 JSON，否则走关键词 mock；
+ * 任何异常（超时／非 2xx／JSON 非法）一律回落 0/0，不阻断剧情。
+ */
+export async function requestStanceJudgement(
+  answer: string,
+  state: GameState
+): Promise<StanceJudgement> {
+  const url = endpoint()
+  if (!url) return mockStanceJudge(answer)
+  try {
+    const body = {
+      prompt: fillPrompt(PROMPT_STANCE_JUDGE, {
+        playerAnswer: answer,
+        storyContext: `守旧值 ${state.tradition}／创新值 ${state.innovation}（0–6，互不联动）`,
+      }),
+    }
+    const text = await withTimeout((signal) => postAiText(url, body, signal))
+    return parseJudge(text)
+  } catch {
+    return { tradition: 0, innovation: 0 }
+  }
+}
+
 /* ---------------- mock 实现（过渡版） ---------------- */
 
 function quote(input: string, max = 10): string {
