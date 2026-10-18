@@ -200,6 +200,11 @@ export interface StancePreset {
   innovation: number
   /** 收束台词（阿鲟／对方角色固定语） */
   close: Line[]
+  /**
+   * 选中后跳转（r6）：C2-X 的 A／B 各引向 `C2-AA`／`C2-BB`；
+   * 缺省时走节点自身的 `nextNodeId`（C／自由／跳过 → C3-1）。
+   */
+  nextNodeId?: string
 }
 
 /** 判定触点配置（C2-X 次触点 / C3-4 主触点；步骤 33 起接入） */
