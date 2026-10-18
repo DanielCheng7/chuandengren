@@ -16,7 +16,7 @@
  * 节点类型 `montage`：引擎「跳过序章」沿链路直达 C1-1，跳过不计访问。
  */
 import type { StoryNode } from '@/types/story'
-import { caption, card, stage } from './format'
+import { caption, stage } from './format'
 
 const CHAPTER = '序章·一盏灯的一生'
 const B = (file: string) => `prologue/${file}`
@@ -157,7 +157,7 @@ export const prologueNodes: StoryNode[] = [
       stage('声音：fish_parade（远远的，像隔了三十年）。'),
       caption('在北坡，鱼不是游给人看的。'),
       caption('旱了，就扎一河的鱼，向天借水。'),
-      card('可现在，河快干了。'),
+      caption('可现在，河快干了。'),
     ],
     nextNodeId: 'C1-1',
   },

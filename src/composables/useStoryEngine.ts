@@ -175,20 +175,25 @@ export function useStoryEngine() {
     return true
   }
 
-  function recordLine() {
-    const l = currentLine.value
-    if (!l) return
+  /** 追加一条回看记录（相邻同文同行去重；会话内截断与存档 slice(-120) 口径一致） */
+  function pushHistory(nid: string, l: Line) {
     const last = history.value[history.value.length - 1]
     if (last && last.text === l.text && last.speaker === l.speaker) return
     history.value.push({
-      nodeId: nodeId.value,
+      nodeId: nid,
       speaker: l.speaker,
       text: l.text,
       type: l.type ?? 'narration',
       aiGenerated: l.aiGenerated,
     })
-    // 会话内同步截断，与存档 slice(-120) 口径一致（OPT-9：防长会话内存无限增长）
+    // OPT-9：防长会话内存无限增长（与存档 slice(-120) 口径一致）
     if (history.value.length > 300) history.value.splice(0, history.value.length - 300)
+  }
+
+  function recordLine() {
+    const l = currentLine.value
+    if (!l) return
+    pushHistory(nodeId.value, l)
   }
 
   function recordChoiceLabel(text: string) {
@@ -354,16 +359,29 @@ export function useStoryEngine() {
     afterLines()
   }
 
-  /** 序章蒙太奇「可跳过不可快进」：沿链路走到第一个非蒙太奇节点（跳过不记 visited） */
+  /**
+   * 序章蒙太奇「可跳过不可快进」：沿链路走到第一个非蒙太奇节点。
+   * 2026-10-18 用户决议：**跳过后回看仍要包含序章全部内容**——沿途每个节点的
+   * 可见文本（caption 等；演示模式下已滤掉 stage）按各自 nodeId 补记入 history，
+   * 回看按章分组时归入「序章」。visitedNodes 仍不记（跳过不计访问，不影响分支判定）。
+   */
   function skipMontage() {
     const start = nodeId.value
+    const chain: string[] = []
     let id = start
     for (let i = 0; i < 32; i++) {
       const n = getNode(id)
       if (!n || n.kind !== 'montage' || !n.nextNodeId) break
+      chain.push(id)
       id = n.nextNodeId
     }
-    if (id !== start && getNode(id)) enterNode(id)
+    if (chain.length === 0 || !getNode(id)) return
+    for (const nid of chain) {
+      const n = getNode(nid)
+      if (!n) continue
+      for (const l of filterLines(n.lines)) pushHistory(nid, l)
+    }
+    enterNode(id)
   }
 
   function choose(choiceId: string) {

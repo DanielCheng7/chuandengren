@@ -35,5 +35,8 @@ export const say = (speaker: Speaker, text: string): Line => ({
   type: 'dialogue',
 })
 
-/** 字幕 / 字卡（章题、结局、尾声；如序章末「可现在，河快干了。」） */
+/**
+ * 字幕（章题、结局、尾声等）：非中央字卡、不参与「按字数自动推进」。
+ * 如需**页面中央渐显渐隐 + 自动推进**（如序章末「可现在，河快干了。」），请用 `caption`。
+ */
 export const card = (text: string): Line => ({ text, type: 'subtitle' })
