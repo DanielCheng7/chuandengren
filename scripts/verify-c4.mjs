@@ -211,19 +211,19 @@ try {
   // 报告行收集结束时已进入 C4 首行——此刻核对「无任何可选项」
   const c4Start = await snap()
   const noChoice = c4Start?.nodeId === 'C4' && (c4Start?.choices?.length ?? 0) === 0 && c4Start?.phase === 'lines'
-  const c4A = await collectUntil((x) => x.phase === 'break')
+  const c4A = await collectUntil((x) => x.phase === 'break' || x.phase === 'end')
   s = await snap()
   const hasA = c4A.some((t) => t.includes('留下来，把灯坊开起来'))
   const hasA2 = c4A.some((t) => t.includes('开春，我留了下来'))
   const wrongA = c4A.some((t) => t.includes('跟着阿禾去了省城') || t.includes('灯海相连'))
   check(
     '② 链 A 温吞（T>I、T≤3）：独白＋转场只出现该档',
-    hasA && hasA2 && !wrongA && s?.nodeId === 'C4',
+    hasA && hasA2 && !wrongA,
     `独白=${hasA} 转场=${hasA2} 串档=${wrongA}`
   )
   check(
-    '③ 结算落点：ending=A / tier=mild → 断点 A1',
-    s?.phase === 'break' && s?.missing === 'A1' && s?.ending === 'A' && s?.tier === 'mild',
+    '③ 结算落点：ending=A / tier=mild → 链 A 结局页 END-A',
+    s?.nodeId === 'END-A' && s?.ending === 'A' && s?.tier === 'mild',
     `node=${s?.nodeId} ending=${s?.ending} tier=${s?.tier} missing=${s?.missing}`
   )
   await shot('02-c4-a-mild')
@@ -236,16 +236,16 @@ try {
   await advanceUntil((x) => x.nodeId === 'C3-R')
   const reportB = await collectUntil((x) => x.nodeId !== 'C3-R')
   const reportLineB = reportB.find((t) => t.includes('两次') || t.includes('只说过一次') || t.includes('没多说什么')) || ''
-  const c4B = await collectUntil((x) => x.phase === 'break')
+  const c4B = await collectUntil((x) => x.phase === 'break' || x.phase === 'end')
   s = await snap()
   check(
-    '④ 链 B 温吞：独白「跟阿禾走」＋转场「我跟着阿禾去了省城」→ 断点 B1',
+    '④ 链 B 温吞：独白「跟阿禾走」＋转场「我跟着阿禾去了省城」→ 链 B 结局页 END-B',
     c4B.some((t) => t.includes('跟阿禾走，让鱼先游出去')) &&
       c4B.some((t) => t.includes('开春，我跟着阿禾去了省城')) &&
       !c4B.some((t) => t.includes('我把行李搬回了灯坊')) &&
+      s?.nodeId === 'END-B' &&
       s?.ending === 'B' &&
-      s?.tier === 'mild' &&
-      s?.missing === 'B1',
+      s?.tier === 'mild',
     `ending=${s?.ending} tier=${s?.tier} missing=${s?.missing}`
   )
   check(
@@ -315,7 +315,7 @@ try {
     `node=${afterReload?.nodeId} phase=${afterReload?.phase} 当前行="${afterReload?.dbox?.slice(0, 18)}"｜命中="${reportLineNone.slice(0, 18)}"`
   )
 
-  const c4C = await collectUntil((x) => x.phase === 'break')
+  const c4C = await collectUntil((x) => x.phase === 'break' || x.phase === 'end')
   s = await snap()
   check(
     '⑧ 链 C 坚定（(3,3)）：独白「把灯坊与海连成一片」＋转场「灯坊的门开着」→ 断点 E1',

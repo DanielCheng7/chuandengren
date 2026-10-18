@@ -106,6 +106,8 @@ const CHAPTER_SCHEME: Record<string, SceneKey> = {
   '第二章·两条路': 'lantern_workshop',
   '第三章·灯会前夜': 'banyan_night',
   '最终抉择·你的手往哪里放': 'lantern_workshop',
+  '链A·守旧线': 'workshop_next_year',
+  '链B·创新线': 'studio_night',
 }
 /** 未显式映射的幕：进入该幕时记录首个场景作为基调，幕内固定不变（后续章节接入也不会跳色） */
 const schemeFallback = ref<SceneKey>(e.sceneKey.value)

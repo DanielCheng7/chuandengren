@@ -8,6 +8,7 @@ import AiFish from './AiFish.vue'
 import LanternVisual from './LanternVisual.vue'
 import SceneBackdrop from './SceneBackdrop.vue'
 import type { StoryEngine } from '@/composables/useStoryEngine'
+import type { SceneKey } from '@/types/story'
 
 const props = defineProps<{ engine: StoryEngine }>()
 const e = props.engine
@@ -32,11 +33,20 @@ const routeLabel = computed(() => {
  * 不展示 endingTier／balancedEp 等内部标记。
  */
 const report = computed(() => [{ k: '灯路', v: routeLabel.value }])
+
+/**
+ * 结局页背景：链 A 回灯坊（三代人的手在同一张木台）；链 B／C 落在游鱼夜
+ * （城市幕墙与村里的百鱼夜游同亮）。原先写死 workshop_next_year，链 B 会串景。
+ */
+const endScene = computed<SceneKey>(() =>
+  e.state.ending === 'A' ? 'workshop_next_year' : 'fish_parade'
+)
 </script>
 
 <template>
   <div class="ending">
-    <SceneBackdrop scene="workshop_next_year" :dim="0.5" />
+    <!-- 结局页背景随走向：链 A 回灯坊；链 B／C 落在游鱼夜（城市与村里的灯河） -->
+    <SceneBackdrop :scene="endScene" :dim="0.5" />
 
     <div class="scroll">
       <header class="head">

@@ -375,12 +375,8 @@ try {
   const findColor = (n) => seen.find((x) => x.nm.includes(n))?.color || ''
   const v = seen[0]?.vars || {}
   check(
-    '⑫ 名字用色按角色映射（九婆纱纸白／阿鲟暖金／阿禾竹青／知遥烛光橙／周经理暗红）',
-    findColor('九婆') === v.paper &&
-      findColor('阿鲟') === v.gold &&
-      findColor('阿禾') === v.bamboo &&
-      findColor('知遥') === v.candle &&
-      findColor('周经理') === 'rgb(201, 112, 93)',
+    '⑫ 名字用色统一纱纸白（2026-10-18 用户决议：不再按角色分色）',
+    ['九婆', '阿鲟', '阿禾', '知遥', '周经理'].every((n) => findColor(n) === v.paper),
     `九婆=${findColor('九婆')} 阿鲟=${findColor('阿鲟')} 阿禾=${findColor('阿禾')} 知遥=${findColor('知遥')} 周=${findColor('周经理')}｜names=${[...new Set(seen.map((x) => x.nm))].join(',')}`
   )
   const dialogLines = seen.filter((x) => x.nm)

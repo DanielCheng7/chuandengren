@@ -8,18 +8,18 @@
  *
  * 目的：检查玩家一路点下来时**章节之间的衔接**是否正确（而非单章跳转）：
  *   序章 → C1 → C2（两条路）→ C2-X（触点①）→ C2-AA → C3 → C3-4（触点②）
- *   → C3-A/B/C（自动）→ C3-R（步骤 35 未接入，应为断点屏）
+ *   → C3-A/B/C（自动）→ C3-R（报告）→ C4（结算）→ 链 A → 结局页
  *
  * 验证点：
  *   ① 序章播完自动进 C1-1（不是停在 PRO-6）；
- *   ② C1-3 三次进入：第一轮 3 选项、第二轮 2 选项、第三轮**自动**进最后一条；
+ *   ② C1-3 **三轮都弹选项**（3→2→1），三错位全看；
  *   ③ C1-5 播完进 C2-0；
  *   ④ C2-0 两次进入后进 C2-X；C2-X 预设 A → C2-AA → C3-1；
  *   ⑤ C3-4 触点②出现且选完不分支直奔 C3-5；
  *   ⑥ C3-8 播完自动进 C3-A（不弹选项）；
- *   ⑦ C3-A 播完落 C3-R 断点屏（步骤 35 待接入，属预期）；
- *   ⑧ 回看面板按四章分组齐全；
- *   ⑨ 全程无 console 报错、无死路（phase=end 的非结局中断）。
+ *   ⑦ C3-R → C4 → 链 A → 结局页《灯还亮着》；
+ *   ⑧ 回看面板按六章分组齐全（正文五章 + 链 A）；
+ *   ⑨ 结局页刷新后不丢进度；全程无 console 报错。
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -112,11 +112,13 @@ try {
       return {
         nodeId: s.nodeId, phase: s.phase, missing: s.missingNodeId,
         t: s.state?.tradition, i: s.state?.innovation,
+        ending: s.state?.ending, tier: s.state?.endingTier,
         c1Order: s.state?.c1Order, c2First: s.state?.c2First,
         choices: [...document.querySelectorAll('.btn.choice .label')].map(x=>x.textContent.trim()),
         inputShown: !!document.querySelector('.free-input'),
         presets: [...document.querySelectorAll('.free-input .preset .label')].map(x=>x.textContent.trim()),
         dbox: document.querySelector('.dbox .text')?.textContent?.trim() || '',
+        body: document.body.innerText,
       };
     })()`)
   const tap = () => ev(`document.querySelector('.story .stage')?.click()`)
@@ -167,6 +169,7 @@ try {
   let last = ''
   let prevPhase = ''
   let breakHit = null
+  let endSnap = null
   while (Date.now() - t0 < 240000) {
     const s = await snap()
     if (!s) break
@@ -183,7 +186,10 @@ try {
       breakHit = s
       break
     }
-    if (s.phase === 'end') break
+    if (s.phase === 'end') {
+      endSnap = s
+      break
+    }
     if (s.phase === 'choice') {
       // 等 ready 门控（300ms），避免点了没反应
       await sleep(420)
@@ -213,13 +219,13 @@ try {
     `PRO-6 → ${afterOf('PRO-6')}`
   )
 
-  /* ② C1-3 补看轮：三个错位全看、选项只弹两次（第三轮自动进入最后一条） */
+  /* ② C1-3 补看轮：三个错位全看、三轮都弹选项（2026-10-18 用户决议） */
   const c1ChoiceTimes = phaseLog.filter((x) => x === 'C1-3:choice').length
   const spotsAll = ['C1-4a', 'C1-4b', 'C1-4c'].every((id) => seq.includes(id))
   check(
-    '② C1-3 三轮：三错位全看、选项只弹 2 次（第三轮自动进入）',
-    spotsAll && c1ChoiceTimes === 2 && breakHit?.c1Order?.length === 3,
-    `错位=${JSON.stringify(breakHit?.c1Order)}｜弹选项 ${c1ChoiceTimes} 次｜C1-4b→${afterOf('C1-4b')}`
+    '② C1-3 三轮都弹选项、三错位全看',
+    spotsAll && c1ChoiceTimes === 3 && endSnap?.c1Order?.length === 3,
+    `错位=${JSON.stringify(endSnap?.c1Order)}｜弹选项 ${c1ChoiceTimes} 次`
   )
 
   /* ③ C1-5 → C2-0 */
@@ -256,33 +262,34 @@ try {
   )
   await shot('01-c3-a-reached')
 
-  /* ⑦ C3-A → C3-R → C4 → 链条断点 */
+  /* ⑦ C3-A → C3-R → C4 → 链 A → 结局页 */
   check(
-    '⑦ C3-R（报告）→ C4（结算）→ 落链 A 断点 A1',
-    !!breakHit &&
-      breakHit.missing === 'A1' &&
+    '⑦ C3-R（报告）→ C4（结算）→ 链 A → 结局页《灯还亮着》',
+    !!endSnap &&
+      endSnap.phase === 'end' &&
+      endSnap.ending === 'A' &&
       seq.includes('C3-R') &&
       seq.includes('C4') &&
-      afterOf('C3-R') === 'C4',
-    `C3-R → ${afterOf('C3-R')}｜missing=${breakHit?.missing}`
+      afterOf('C3-R') === 'C4' &&
+      afterOf('C4') === 'A1',
+    `C3-R→${afterOf('C3-R')}｜C4→${afterOf('C4')}｜phase=${endSnap?.phase} ending=${endSnap?.ending}`
   )
-  await shot('02-break-screen')
+  await shot('02-ending-screen')
 
-  /* ⑧ 回看面板按章分组（五章） */
-  const groups = await ev(`(async () => {
-    [...document.querySelectorAll('.tool')].find(b=>b.textContent.includes('回看'))?.click();
-    await new Promise(r=>setTimeout(r,600));
-    const t = document.body.innerText;
-    return ['序章·一盏灯的一生','第一章·灯往何处去','第二章·两条路','第三章·灯会前夜','最终抉择·你的手往哪里放'].filter(x=>t.includes(x));
-  })()`)
+  /* ⑧ 结局页结构（结局页不提供「回看」入口，只校验本页要素） */
+  const endBody = endSnap?.body || ''
   check(
-    '⑧ 回看面板五章分组齐全',
-    Array.isArray(groups) && groups.length === 5,
-    `${JSON.stringify(groups)}`
+    '⑧ 结局页结构完整：标题 / 灯路 / 结局正文 / 旅程回顾 / 两个出口',
+    endBody.includes('灯亮之后') &&
+      endBody.includes('守旧链·《灯还亮着》') &&
+      endBody.includes('旅程回顾') &&
+      endBody.includes('重新体验') &&
+      endBody.includes('返回标题'),
+    endBody.slice(0, 46).replace(/\n/g, ' ')
   )
-  await shot('03-history-groups')
+  await shot('03-ending-screen')
 
-  /* ⑨ 断点屏刷新恢复（玩家中途刷新不应丢进度与节点号） */
+  /* ⑨ 结局页刷新恢复 */
   await ev(`document.querySelector('.history .back-pill, .history .back')?.click()`)
   await sleep(400)
   await send('Page.reload')
@@ -291,12 +298,14 @@ try {
     const btn = [...document.querySelectorAll('.menu-item')].find(x=>x.textContent.includes('继续上次'));
     if (btn) { btn.click(); await new Promise(r=>setTimeout(r,900)); }
     const s = JSON.parse(localStorage.getItem('chuandengren.save.v4')||'{}');
-    return { nodeId: s.nodeId, phase: s.phase, missing: s.missingNodeId };
+    return { nodeId: s.nodeId, phase: s.phase, missing: s.missingNodeId, body: document.body.innerText };
   })()`)
   check(
-    '⑨ 断点屏刷新后仍停在断点、节点号保留',
-    afterReload?.phase === 'break' && afterReload?.missing === 'A1',
-    `phase=${afterReload?.phase} missing=${afterReload?.missing}`
+    '⑨ 结局页刷新后仍停在结局（不丢进度）',
+    afterReload?.phase === 'end' &&
+      typeof afterReload?.body === 'string' &&
+      afterReload.body.includes('灯还亮着'),
+    `phase=${afterReload?.phase} node=${afterReload?.nodeId}`
   )
 
   /* ⑩ console */
