@@ -56,11 +56,11 @@ defineProps<{
     transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* 消失：轻盈上浮淡出（与弹出对称，先快后缓） */
+/* 消失：轻盈上浮淡出（0.95s，2026-10-18 用户决议：淡出加长 0.5s，更从容） */
 .card-leave-active {
   transition:
-    opacity 0.45s cubic-bezier(0.55, 0, 0.55, 0.2),
-    transform 0.45s cubic-bezier(0.55, 0, 0.55, 0.2);
+    opacity 0.95s cubic-bezier(0.55, 0, 0.55, 0.2),
+    transform 0.95s cubic-bezier(0.55, 0, 0.55, 0.2);
 }
 
 .card-enter-from {

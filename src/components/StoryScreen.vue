@@ -171,7 +171,7 @@ function clearCardTimer() {
   cardTimer = undefined
 }
 
-/** 停留时长按文字长度：1500ms 基础 + 130ms/字，钳制在 2.5–7.5s */
+/** 停留时长按文字长度：1500ms 基础 + 130ms/字，钳制在 2.5–7.5s；序章蒙太奇每屏再 +2s */
 function scheduleCardAdvance() {
   clearCardTimer()
   if (phase.value !== 'lines') return
@@ -190,7 +190,9 @@ function scheduleCardAdvance() {
   const card = currentSceneCard.value
   if (!card) return
   const chars = Array.from(card.text).length
-  const delay = Math.min(7500, Math.max(2500, 1500 + chars * 130))
+  // 序章蒙太奇节奏更缓：每屏停留 +2s（2026-10-18 用户决议）
+  const montageExtra = e.node.value?.kind === 'montage' ? 2000 : 0
+  const delay = Math.min(7500, Math.max(2500, 1500 + chars * 130)) + montageExtra
   cardTimer = window.setTimeout(() => {
     if (phase.value === 'lines' && currentSceneCard.value) e.advance()
   }, delay)

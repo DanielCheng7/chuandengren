@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * 《传灯人》互动叙事网页原型
- * 屏幕路由：标题页 →（开场 CG）→ 剧情页 → 结局页
+ * 屏幕路由：标题页 →（渐隐·黑场）→ 开场 CG → 剧情页 → 结局页
  */
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import EndingScreen from './components/EndingScreen.vue'
 import OpeningCg from './components/OpeningCg.vue'
 import StoryScreen from './components/StoryScreen.vue'
@@ -18,20 +18,53 @@ const view = computed<'title' | 'story' | 'ending'>(() => {
   return 'story'
 })
 
-/** 开场 CG：点「开始旅程」后先全屏播放，播完（或跳过后）再正式进入序章 */
-const showCg = ref(false)
+/**
+ * 开场流程阶段：idle → fade（标题页渐隐 0.55s）→ black（纯黑 1.5s）→ play（CG 渐显）
+ * （2026-10-18 用户决议）
+ */
+const cgStage = ref<'idle' | 'fade' | 'black' | 'play'>('idle')
+let stageTimers: number[] = []
+
+function beginJourney() {
+  if (cgStage.value !== 'idle') return
+  cgStage.value = 'fade'
+  stageTimers.push(
+    window.setTimeout(() => {
+      cgStage.value = 'black'
+      stageTimers.push(
+        window.setTimeout(() => {
+          cgStage.value = 'play'
+        }, 1500)
+      )
+    }, 560)
+  )
+}
+
 function finishCg() {
-  showCg.value = false
+  stageTimers.forEach((t) => window.clearTimeout(t))
+  stageTimers = []
+  cgStage.value = 'idle'
   engine.startFresh()
 }
+
+/** 标题页仅在「开场流程未启动且处于标题态」时存在；fade 阶段由 Transition 播放渐隐 */
+const showTitle = computed(() => cgStage.value === 'idle' && view.value === 'title')
+
+onUnmounted(() => stageTimers.forEach((t) => window.clearTimeout(t)))
 </script>
 
 <template>
   <div class="app-shell grain">
-    <OpeningCg v-if="showCg" @done="finishCg" />
-    <TitleScreen v-else-if="view === 'title'" :engine="engine" @begin="showCg = true" />
-    <EndingScreen v-else-if="view === 'ending'" :engine="engine" />
-    <StoryScreen v-else :engine="engine" />
+    <!-- 黑场垫底：标题页渐隐时露出纯黑；黑屏 1.5s 后 CG 再渐显 -->
+    <div v-if="cgStage !== 'idle'" class="cg-blackout" aria-hidden="true" />
+
+    <OpeningCg v-if="cgStage === 'play'" @done="finishCg" />
+
+    <Transition name="title-out">
+      <TitleScreen v-if="showTitle" :engine="engine" @begin="beginJourney" />
+    </Transition>
+    <EndingScreen v-if="!showTitle && view === 'ending'" :engine="engine" />
+    <StoryScreen v-if="!showTitle && view === 'story'" :engine="engine" />
   </div>
 </template>
 
@@ -59,5 +92,21 @@ function finishCg() {
     max-width: none;
     box-shadow: 0 30px 90px rgba(4, 9, 20, 0.72), 0 0 1px rgba(245, 239, 226, 0.16);
   }
+}
+
+/* 开场黑场：垫在标题页之下（DOM 顺序在前），标题页渐隐时露出纯黑 */
+.cg-blackout {
+  position: absolute;
+  inset: 0;
+  background: #05080f;
+}
+
+/* 标题页离场：渐隐至黑（0.55s，随后进入 1.5s 黑屏） */
+.title-out-leave-active {
+  transition: opacity 0.55s ease;
+}
+
+.title-out-leave-to {
+  opacity: 0;
 }
 </style>
