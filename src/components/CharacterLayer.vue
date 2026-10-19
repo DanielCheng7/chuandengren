@@ -3,42 +3,60 @@
  * 角色立绘层（V3.0，2026-10-19 重定站位规则）
  *
  * **在场角色**：由引擎 `cast` 决定，整场常驻——旁白行不消失，只在换场景或离场时切换。
- * **同屏上限 3 人**（2026-10-19 用户决议）：超出由 `limitCast()` 按 CAST_PRIORITY 让位，
+ * **同屏上限 2 人**（2026-10-19 用户第二次收窄）：超出由 `limitCast()` 按 CAST_PRIORITY 让位，
  * 被裁掉的角色本场景不入场，留到后续场景。
- * **阿鲟也是角色**：**不套窗口/黑框**，跟人物同一套站位规则；
- * 只因自身是 2:1 横卧鱼灯，用宽度约束；落点固定贴在对白带上沿（`--dbox-top`）。
  *
- * **站位规则（所有场景一致）**：
- *  ① **首次登场默认在左**——按 cast 顺序（= 登场顺序）从左往右排；
- *     1 人贴左 12%，2 人左右分列（左右各 12%），3 人均布；
- *  ② 多人互不重叠——由 flex 均分保证，不再逐人写死 left/right 导致撞车。
+ * **站位与素材一一对应（2026-10-19 用户补充左右站位素材）**：
+ *  · **左槽 → `*-left.webp`，右槽 → `*-right.webp`**；1 人时站左槽（首次登场默认在左）。
+ *  · 某一侧文件缺失时自动回退另一侧；两侧都失败才剔除该角色。
+ *
+ * **阿鲟也是角色**：不套窗口/黑框，跟人物同一套站位规则；
+ * 只因自身是 2:1 横卧鱼灯，用宽度约束；落点固定贴在对白带上沿（`--dbox-top`）。
  *
  * **层级**：本层挂在 `.story` 下（不在可滚动的 `.stage` 里），z-index 低于舞台，
  * 因此对白带会自然盖住人物下半身，且不会给舞台添滚动条。
  *
- * **缺素材**：某个角色 404 → 只剔除该角色，其余照常；全部失败则整层不渲染，不留空框。
+ * **缺素材**：该角色两侧都 404 → 只剔除它，其余照常；全部失败则整层不渲染，不留空框。
  */
 import { computed, ref } from 'vue'
-import { canStandOnStage, getCharacter } from '@/data/characters'
+import { canStandOnStage, getCharacter, portraitOf } from '@/data/characters'
+import type { PortraitSide } from '@/data/characters'
 
 const props = defineProps<{
   /** 在场角色（引擎 cast，已含阿鲟、已排除第一人称主角） */
   cast?: string[]
 }>()
 
-/** 加载失败的角色（文件缺失是持久状态，切换场景不清空） */
+/** 加载失败的角色（两侧都缺，持久状态） */
 const broken = ref<string[]>([])
+/** 已退回另一侧素材的角色（本侧文件缺失） */
+const flipped = ref<string[]>([])
 
-const srcOf = (who: string) => {
-  const def = getCharacter(who)
-  return def?.asset ? `/assets/characters/${def.asset}` : ''
+/** 槽位 → 站位：1 人站左；2 人时第 1 位左、第 2 位右 */
+const sideOf = (i: number): PortraitSide => (i === 0 ? 'left' : 'right')
+
+const srcOf = (who: string, i: number) => {
+  const base = sideOf(i)
+  const side: PortraitSide = flipped.value.includes(who)
+    ? base === 'left'
+      ? 'right'
+      : 'left'
+    : base
+  const file = portraitOf(who, side)
+  return file ? `/assets/characters/${file}` : ''
 }
 
-/** 场上角色：按 cast 顺序从左往右排，最多 3 位（引擎已按优先级裁过，这里兜底） */
+const onImgError = (who: string) => {
+  if (!flipped.value.includes(who)) {
+    flipped.value = [...flipped.value, who]
+    return
+  }
+  if (!broken.value.includes(who)) broken.value = [...broken.value, who]
+}
+
+/** 场上角色：按 cast 顺序从左往右排，最多 2 位（引擎已按优先级裁过，这里兜底） */
 const standers = computed(() =>
-  (props.cast ?? [])
-    .filter((who) => canStandOnStage(who) && srcOf(who) && !broken.value.includes(who))
-    .slice(0, 3)
+  (props.cast ?? []).filter((who) => canStandOnStage(who) && !broken.value.includes(who)).slice(0, 2)
 )
 
 const total = computed(() => standers.value.length)
@@ -48,8 +66,19 @@ const isAshun = (who: string) => who === '阿鲟'
 <template>
   <div v-if="total > 0" class="char-stage" :class="`n${total}`">
     <div class="row">
-      <div v-for="who in standers" :key="who" class="char" :class="{ 'is-ashun': isAshun(who) }">
-        <img :src="srcOf(who)" :alt="getCharacter(who)?.name" @error="broken.push(who)" />
+      <div
+        v-for="(who, i) in standers"
+        :key="who"
+        class="char"
+        :class="[{ 'is-ashun': isAshun(who) }, `slot-${sideOf(i)}`]"
+        :data-side="sideOf(i)"
+      >
+        <img
+          :src="srcOf(who, i)"
+          :alt="getCharacter(who)?.name"
+          :data-who="who"
+          @error="onImgError(who)"
+        />
       </div>
     </div>
   </div>
@@ -80,16 +109,10 @@ const isAshun = (who: string) => who === '阿鲟'
   padding-left: 12%;
 }
 
-/* 2 人：左右两侧分列 */
+/* 2 人：左右两侧分列（第 1 位左槽、第 2 位右槽） */
 .char-stage.n2 .row {
   justify-content: space-between;
-  padding: 0 12%;
-}
-
-/* 3 人：均布 */
-.char-stage.n3 .row {
-  justify-content: space-between;
-  padding: 0 3%;
+  padding: 0 10%;
 }
 
 /* ---------- 角色 ---------- */
@@ -118,9 +141,6 @@ const isAshun = (who: string) => who === '阿鲟'
 .char-stage.n2 .char {
   height: min(84vh, 1000px);
 }
-.char-stage.n3 .char {
-  height: min(78vh, 900px);
-}
 
 /* ---------- 阿鲟：2:1 横卧鱼灯 ----------
    它也是角色，**不套窗口/黑框**；只因横宽比例，改用宽度约束。
@@ -147,10 +167,6 @@ const isAshun = (who: string) => who === '阿鲟'
 }
 
 /* 人多时阿鲟收一档，避免挤到邻居（高度随宽度等比缩，落点仍贴对白带） */
-.char-stage.n3 .char.is-ashun {
-  width: min(24vw, 380px);
-}
-
 @keyframes ashun-float {
   0%,
   100% {
@@ -167,7 +183,7 @@ const isAshun = (who: string) => who === '阿鲟'
     padding-left: 8%;
   }
   .char-stage.n2 .row {
-    padding: 0 6%;
+    padding: 0 5%;
   }
   .char-stage.n1 .char {
     height: min(84vh, 760px);
@@ -175,14 +191,8 @@ const isAshun = (who: string) => who === '阿鲟'
   .char-stage.n2 .char {
     height: min(80vh, 720px);
   }
-  .char-stage.n3 .char {
-    height: min(70vh, 640px);
-  }
   .char-stage .char.is-ashun {
     width: min(38vw, 300px);
-  }
-  .char-stage.n3 .char.is-ashun {
-    width: min(30vw, 240px);
   }
 }
 

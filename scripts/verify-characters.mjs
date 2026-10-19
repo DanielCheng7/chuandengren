@@ -218,18 +218,19 @@ try {
     `采样 ${rows.length} 行，其中旁白 ${narRows.length} 行；各行立绘数=${[...new Set(rows.map((r) => r.count))].join('/')}`
   )
 
-  /* ===== B. 版式：单人 92vh、靠右、腿部被对白带裁 ===== */
+  /* ===== B. 版式：单人 88vh、靠左、腿被对白带裁、用左站位素材 ===== */
   const solo = c12?.rects[0]
   check(
-    '③ 版式：单人 ≈88vh、**首次登场在左侧**、水平不出画、底边越过对白带（腿被裁）',
+    '③ 版式：单人 ≈88vh、在左侧、不出画、底边越过对白带（腿被裁）、用 -left 素材',
     !!solo &&
       solo.h >= (c12.vh * 0.84) &&
       solo.h <= c12.vh * 0.96 &&
       solo.x < c12.vw * 0.5 &&
       solo.x >= 0 &&
       solo.right <= c12.vw + 1 &&
-      solo.bottom > (c12.dboxTop ?? 0),
-    `图 ${solo?.w}x${solo?.h} @ x=${solo?.x} 底=${solo?.bottom} 对白顶=${c12?.dboxTop} 视高=${c12?.vh}`
+      solo.bottom > (c12.dboxTop ?? 0) &&
+      (solo.src || '').endsWith('-left.webp'),
+    `图 ${solo?.w}x${solo?.h} @ x=${solo?.x} 底=${solo?.bottom} 对白顶=${c12?.dboxTop} 视高=${c12?.vh}｜${(solo?.src || '').split('/').pop()}`
   )
 
   /* ===== C. 换场景重建：夜市摊只有阿鲟 → 无人物立绘 ===== */
@@ -243,9 +244,10 @@ try {
   const nightNow = await probe()
   const nightWho = await ev(`[...document.querySelectorAll('.char-stage .char')].map((el) => el.classList.contains('is-ashun') ? '阿鲟' : '人物')`)
   check(
-    '④ 换场景重建：夜市摊只有阿鲟（无人物立绘）',
-    !!night && nightNow?.count === 1 && nightWho?.[0] === '阿鲟',
-    `node=${nightNow?.nodeId} 场上=${JSON.stringify(nightWho)}`
+    '④ 换场景重建：夜市摊只有阿鲟（无人物立绘，用左站位素材）',
+    !!night && nightNow?.count === 1 && nightWho?.[0] === '阿鲟' &&
+      (nightNow?.rects?.[0]?.src || '').includes('char-ashun-left'),
+    `node=${nightNow?.nodeId} 场上=${JSON.stringify(nightWho)} ${(nightNow?.rects?.[0]?.src || '').split('/').pop()}`
   )
   await shot('02-night-stall')
 
@@ -258,31 +260,39 @@ try {
   const noOverlap2 =
     duoNow?.count === 2 && duoNow.rects[0].right <= duoNow.rects[1].x + 8
   check(
-    '⑤ 双人分列不重叠（E1 九婆＋阿禾）',
-    !!duo && duoNow?.count === 2 && noOverlap2,
+    '⑤ 双人分列不重叠（E1 九婆＋阿禾），左槽 -left／右槽 -right',
+    !!duo &&
+      duoNow?.count === 2 &&
+      noOverlap2 &&
+      (duoNow.rects[0].src || '').endsWith('-left.webp') &&
+      (duoNow.rects[1].src || '').endsWith('-right.webp'),
     duoNow?.rects?.map((r) => `${r.src.split('/').pop()}@${r.x}-${r.right}`).join(' | ') || '无'
   )
   await shot('03-duo-e1')
 
-  /* ===== E. 三人分列（C3-2：九婆 + 阿禾 + 周经理；阿鲟按同屏上限让位） ===== */
+  /* ===== E. 上限 2 人：C3-2 有 4 个说话人 → 只上优先级最高的九婆＋阿禾 ===== */
   await freshBoot()
   await jumpTo('C3-1')
   const trio = await advanceToNode(['C3-2'])
   await sleep(500)
   const trioNow = await probe()
-  const xs = (trioNow?.rects ?? []).map((r) => r.x).sort((a, b) => a - b)
-  const gaps = xs.slice(1).map((x, i) => x - xs[i])
-  const noOverlap3 = xs.length === 3 && gaps.every((g) => g > 80)
-  const trioSrcs = (trioNow?.rects ?? []).map((r) => r.src)
+  const trioNames = (trioNow?.rects ?? []).map((r) => r.src.split('/').pop())
+  const xs2 = (trioNow?.rects ?? []).map((r) => r.x).sort((a, b) => a - b)
   check(
-    '⑥ 三人均布不重叠（C3-2 围坐：九婆＋阿禾＋周经理，阿鲟让位）',
-    !!trio && trioNow?.count === 3 && noOverlap3 && trioSrcs.some((s) => s.includes('zhou')) &&
-      !trioSrcs.some((s) => s.includes('ashun')),
-    `${trioNow?.count} 人 @ x=${xs.join('/')}｜${trioSrcs.map((s) => s.split('/').pop()).join(',')}`
+    '⑥ 同屏上限 2 人：C3-2（九婆/周经理/阿鲟/阿禾）只上九婆＋阿禾',
+    !!trio &&
+      trioNow?.count === 2 &&
+      trioNames.some((s) => s.includes('jiupo')) &&
+      trioNames.some((s) => s.includes('ahe')) &&
+      !trioNames.some((s) => s.includes('zhou')) &&
+      !trioNames.some((s) => s.includes('ashun')) &&
+      xs2.length === 2 &&
+      xs2[1] - xs2[0] > 200,
+    `2 人 @ x=${xs2.join('/')}｜${trioNames.join(',')}`
   )
   await shot('04-trio-c3-2')
 
-  /* ===== E2. 同场景内离场：C3-8 → C3-A，周经理退场、阿鲟在场 ===== */
+  /* ===== E2. 同场景换节点：cast 稳定不闪人（C3-8 → C3-A） ===== */
   await freshBoot()
   await jumpTo('C3-1')
   await advanceToNode(['C3-8'], 120000)
@@ -291,18 +301,16 @@ try {
   await advanceToNode(['C3-A'], 60000)
   await sleep(400)
   const afterLeave = await probe()
-  const beforeNames = (beforeLeave?.rects ?? []).map((r) => r.src.split('/').pop())
-  const afterNames = (afterLeave?.rects ?? []).map((r) => r.src.split('/').pop())
+  const castNames = (p) => (p?.rects ?? []).map((r) => r.src.split('/').pop()).sort().join(',')
   check(
-    '⑥-2 同场景内「人散了」：周经理退场、阿鲟接上（均不超过 3 人）',
-    beforeLeave?.count === 3 &&
-      afterLeave?.count === 3 &&
+    '⑥-2 换节点跟着说话人走：C3-8 周经理在场 → C3-A 周经理退场、阿禾上场（均 2 人）',
+    beforeLeave?.count === 2 &&
+      afterLeave?.count === 2 &&
       afterLeave?.nodeId === 'C3-A' &&
-      beforeNames.some((s) => s.includes('zhou')) &&
-      !beforeNames.some((s) => s.includes('ashun')) &&
-      afterNames.some((s) => s.includes('ashun')) &&
-      !afterNames.some((s) => s.includes('zhou')),
-    `C3-8=${beforeNames.join(',')} → C3-A=${afterNames.join(',')}`
+      castNames(beforeLeave).includes('zhou') &&
+      castNames(afterLeave).includes('ahe') &&
+      !castNames(afterLeave).includes('zhou'),
+    `C3-8=${castNames(beforeLeave)} → C3-A=${castNames(afterLeave)}`
   )
   await shot('05-leave-c3a')
 

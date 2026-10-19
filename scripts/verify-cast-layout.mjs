@@ -108,7 +108,9 @@ try {
       const s = JSON.parse(localStorage.getItem('${SAVE}')||'{}');
       const rects = [...document.querySelectorAll('.char-stage .char img')].map((i) => {
         const r = i.getBoundingClientRect();
-        return { who: i.getAttribute('src').replace(/^.*char-|\.webp$/g,''),
+        const src = i.getAttribute('src') || '';
+        return { who: src.replace(/^.*char-|-(left|right)\.webp$/g,''),
+                 side: (src.match(/-(left|right)\.webp$/) || [,'?'])[1],
                  x: Math.round(r.x), right: Math.round(r.right), h: Math.round(r.height),
                  bottom: Math.round(r.bottom) };
       });
@@ -205,13 +207,27 @@ try {
   )
   check('④ 全程无 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 
-  // 2026-10-19 用户决议：一个场景最多 3 名角色，超出由 limitCast() 按优先级让位
-  const overCap = rows.filter((r) => r.count > 3)
+  // 2026-10-19 用户第二次收窄：一个场景最多 2 名角色，超出由 limitCast() 按优先级让位
+  const overCap = rows.filter((r) => r.count > 2)
   check(
-    '⑤ 同屏角色不超过 3 人',
+    '⑤ 同屏角色不超过 2 人',
     overCap.length === 0,
     overCap.map((r) => `${r.nid}:${r.count}人`).join('｜') ||
       `全 ${rows.length} 点最多 ${Math.max(0, ...rows.map((r) => r.count))} 人`
+  )
+
+  // 站位 → 素材：左槽必须用 *-left.webp、右槽必须用 *-right.webp
+  const badSide = []
+  for (const r of rows) {
+    r.rects.forEach((rr, i) => {
+      const want = i === 0 ? 'left' : 'right'
+      if (rr.side !== want) badSide.push(`${r.nid}: 第 ${i + 1} 位 ${rr.who} 用了 ${rr.side}`)
+    })
+  }
+  check(
+    '⑥ 站位与素材一一对应（左槽 -left／右槽 -right）',
+    badSide.length === 0,
+    badSide.slice(0, 4).join('｜') || '全部匹配'
   )
 
   writeFileSync(join(OUT, 'layout.json'), JSON.stringify(rows, null, 2))

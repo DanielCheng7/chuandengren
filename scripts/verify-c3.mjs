@@ -392,20 +392,29 @@ try {
       badDialog[0] ? `｜样本 ${badDialog[0].nm}${badDialog[0].tx.slice(0, 20)}` : ''
     }`
   )
-  // 2026-10-19：同屏上限 3 人后，阿鲟在 C3-2 这类 4 人场景会让位（只留名条），
-  // 所以不再要求"每句阿鲟台词都配立绘"，改判终点节点（C3-A，cast 含阿鲟）：
-  // **阿鲟在场就一定要有已加载的立绘**。
-  const ashunNow = await ev(`(() => {
-    const el = document.querySelector('.char-stage .char.is-ashun img');
-    return el ? { src: el.getAttribute('src'), w: el.naturalWidth } : null;
-  })()`)
+  // 2026-10-19 同屏上限 2 人后，阿鲟在 C3-2（4 人场景）会让位；C3-5「阿鲟的陈述」
+  // 是它独占的场景 → 用该节点确定性地验"在场即有立绘"。
   const ashunLines = seen.filter((x) => x.nm.includes('阿鲟')).length
+  await freshBoot()
+  await jumpToC3()
+  await advanceUntil((x) => x.nodeId === 'C3-4' && x.phase === 'input')
+  await ev(`[...document.querySelectorAll('.free-input .preset')][0]?.click()`)
+  await sleep(400)
+  await advanceUntil((x) => x.nodeId === 'C3-5')
+  await sleep(400)
+  const ashunAt = await ev(`(() => {
+    const stage = document.querySelector('.char-stage');
+    const el = document.querySelector('.char-stage .char.is-ashun img');
+    const chars = [...document.querySelectorAll('.char-stage .char')].map((c) => c.className + '|' + (c.querySelector('img')?.getAttribute('src') || '-'));
+    return el ? { src: el.getAttribute('src'), w: el.naturalWidth, chars }
+              : { src: null, w: 0, chars, stage: stage ? stage.className : null };
+  })()`)
   check(
-    '⑭ 阿鲟在场即有立绘 char-ashun.webp（已加载，与人物并排）',
-    !!ashunNow && ashunNow.src.includes('char-ashun') && ashunNow.w > 0,
-    ashunNow
-      ? `${ashunNow.src} w=${ashunNow.w}｜本段阿鲟台词 ${ashunLines} 行`
-      : `未捕获（阿鲟台词 ${ashunLines} 行）`
+    '⑭ 阿鲟在场即有立绘 char-ashun-{left,right}.webp（已加载）',
+    !!ashunAt && /char-ashun-(left|right)\.webp$/.test(ashunAt.src) && ashunAt.w > 0,
+    ashunAt
+      ? `C3-5 ${ashunAt.src} w=${ashunAt.w}｜本段阿鲟台词 ${ashunLines} 行`
+      : `未捕获（本段阿鲟台词 ${ashunLines} 行）场上=${JSON.stringify(ashunAt?.chars)} stage=${ashunAt?.stage}`
   )
   check('⑮ 自检段无新增 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 
@@ -457,6 +466,10 @@ try {
     for (const f of failed) console.log('-', f.name, f.detail)
     process.exitCode = 2
   }
+} catch (err) {
+  // 别把异常吞掉：否则脚本"静默失败"，分不清是断言挂了还是代码炸了
+  console.error('\n[verify-c3 异常]', err)
+  process.exitCode = 1
 } finally {
   edge.kill()
   process.exit(process.exitCode ?? 0)

@@ -18,7 +18,12 @@
 export interface CharacterDef {
   /** 显示名 */
   name: string
-  /** 立绘文件（相对 /assets/characters/），缺省＝暂无立绘 */
+  /**
+   * 立绘：**按站位分左右两版**（2026-10-19 用户补充素材）。
+   * 站在左槽用 `left`，右槽用 `right`；缺某一侧时自动回退另一侧。
+   */
+  assets?: { left?: string; right?: string }
+  /** 兼容字段：只有一张、不分站位时使用（现已被 assets 取代） */
   asset?: string
   /**
    * 主角不上立绘（第一人称视角，2026-10-19 用户要求与市面 galgame 一致）：
@@ -29,17 +34,57 @@ export interface CharacterDef {
   kind?: 'human' | 'ai'
 }
 
+/** 站位槽位：左／右（由 cast 顺序决定，第 1 位在左、第 2 位在右） */
+export type PortraitSide = 'left' | 'right'
+
 export const CHARACTERS: Record<string, CharacterDef> = {
-  知遥: { name: '林知遥', asset: 'char-lin-zhiyao-b.webp', noPortrait: true },
-  九婆: { name: '九婆', asset: 'char-jiupo.webp', kind: 'human' },
-  阿禾: { name: '阿禾', asset: 'char-ahe.webp', kind: 'human' },
-  周经理: { name: '周经理', asset: 'char-zhou.webp', kind: 'human' },
-  阿鲟: { name: '阿鲟', asset: 'char-ashun.webp', kind: 'ai' }, // 鱼灯本体立绘，走 CharacterLayer 的独立档位
+  知遥: {
+    name: '林知遥',
+    assets: { left: 'char-lin-zhiyao-b-left.webp', right: 'char-lin-zhiyao-b-right.webp' },
+    noPortrait: true,
+  },
+  九婆: {
+    name: '九婆',
+    assets: { left: 'char-jiupo-left.webp', right: 'char-jiupo-right.webp' },
+    kind: 'human',
+  },
+  阿禾: {
+    name: '阿禾',
+    assets: { left: 'char-ahe-left.webp', right: 'char-ahe-right.webp' },
+    kind: 'human',
+  },
+  周经理: {
+    name: '周经理',
+    assets: { left: 'char-zhou-left.webp', right: 'char-zhou-right.webp' },
+    kind: 'human',
+  },
+  阿鲟: {
+    name: '阿鲟',
+    assets: { left: 'char-ashun-left.webp', right: 'char-ashun-right.webp' },
+    kind: 'ai',
+  },
 }
 
 export function getCharacter(speaker?: string): CharacterDef | undefined {
   if (!speaker) return undefined
   return CHARACTERS[speaker]
+}
+
+/** 该角色是否配了立绘（任一侧即可） */
+export function hasPortrait(speaker?: string): boolean {
+  const c = getCharacter(speaker)
+  return !!c && !!(c.assets?.left || c.assets?.right || c.asset)
+}
+
+/**
+ * 取某角色在指定站位的立绘文件名。
+ * 该侧缺失时回退另一侧（素材未补齐也能显示，只是姿势可能不贴合）。
+ */
+export function portraitOf(speaker?: string, side: PortraitSide = 'left'): string | undefined {
+  const c = getCharacter(speaker)
+  if (!c) return undefined
+  const other: PortraitSide = side === 'left' ? 'right' : 'left'
+  return c.assets?.[side] ?? c.assets?.[other] ?? c.asset
 }
 
 /**
@@ -48,15 +93,14 @@ export function getCharacter(speaker?: string): CharacterDef | undefined {
  * 只是自身是 2:1 横卧鱼灯，尺寸与落点单独处理（见 CharacterLayer）。
  */
 export function canStandOnStage(speaker?: string): boolean {
-  const c = getCharacter(speaker)
-  return !!c && !!c.asset && !c.noPortrait
+  return hasPortrait(speaker) && !getCharacter(speaker)?.noPortrait
 }
 
 /**
- * 同屏上限（2026-10-19 用户决议）：一个场景**最多同时 3 名角色**，
+ * 同屏上限（2026-10-19 用户第二次收窄）：一个场景**最多同时 2 名角色**，
  * 超出按主次优先级取舍；被裁掉的角色本场景不入场，等下一个场景再出现。
  */
-export const CAST_MAX = 3
+export const CAST_MAX = 2
 
 /**
  * 站台优先级：数字越小越优先保留（剧情主次，非出场先后）。
@@ -71,17 +115,36 @@ export const CAST_PRIORITY: Record<string, number> = {
 }
 
 /**
- * 把候选角色裁到同屏上限：先按优先级保留，**再恢复登场顺序**——
- * 站位是「按 cast 顺序从左往右」，所以裁完必须还原原序，否则人物会莫名调位。
+ * 把候选角色裁到同屏上限：
+ *  ① **`pin`（本节点说话人）先占位**——谁在这段里开口，谁就必须在场，
+ *    否则会出现"周经理说话、台上没他"的错位；
+ *  ② 剩余名额按 `CAST_PRIORITY` 补，同级按原顺序；
+ *  ③ 最后**还原原顺序**（站位按 cast 顺序排，不还原会让人物莫名调位）。
  */
-export function limitCast(list: string[], max = CAST_MAX): string[] {
+export function limitCast(list: string[], max = CAST_MAX, pin: string[] = []): string[] {
   const uniq = [...new Set(list.filter((s) => canStandOnStage(s)))]
   if (uniq.length <= max) return uniq
   const rank = (s: string) => CAST_PRIORITY[s] ?? 99
-  return uniq
+  const pinSet = new Set(pin.filter((s) => uniq.includes(s)))
+  const kept = new Set<string>()
+  // ① 说话人优先：pins 本身超过上限时，也在 pins 内部按优先级取
+  const pinned = uniq
+    .filter((s) => pinSet.has(s))
     .map((s, i) => ({ s, i, r: rank(s) }))
-    .sort((a, b) => a.r - b.r || a.i - b.i) // 优先级高者先占位；同级按登场先后
-    .slice(0, max)
-    .sort((a, b) => a.i - b.i) // 还原登场顺序 → 站位稳定
-    .map((x) => x.s)
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+  for (const x of pinned) {
+    if (kept.size >= max) break
+    kept.add(x.s)
+  }
+  // ② 余下名额按优先级补（同级按登场先后）
+  const rest = uniq
+    .filter((s) => !kept.has(s))
+    .map((s, i) => ({ s, i, r: rank(s) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+  for (const x of rest) {
+    if (kept.size >= max) break
+    kept.add(x.s)
+  }
+  // ③ 还原原顺序 → 站位稳定
+  return uniq.filter((s) => kept.has(s))
 }

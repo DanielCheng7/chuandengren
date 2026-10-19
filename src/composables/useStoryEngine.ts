@@ -24,7 +24,7 @@
 import { computed, reactive, ref } from 'vue'
 import { START_NODE_ID, getNode, nodeProgress } from '@/data/story'
 import { useSettings } from '@/composables/useSettings'
-import { canStandOnStage, limitCast } from '@/data/characters'
+import { CAST_MAX, canStandOnStage, limitCast } from '@/data/characters'
 import { ASHUN_FALLBACK_LINES } from '@/data/fallbackDialogue'
 import { buildStanceReportLine } from '@/utils/report'
 import {
@@ -162,7 +162,7 @@ export function useStoryEngine() {
    * 在场人物（立绘常驻，2026-10-19 用户要求与市面 galgame 一致）：
    * 立绘不随「这一行是谁在说」闪进闪出，而是**一场戏里持续在场**——
    *  - 换场景 → 按新节点重建（旧场景的人不跟过去）；
-   *  - 同场景换节点 → 与本节点说话人合并（**上限 3**，超出按 CAST_PRIORITY 让位）；
+   *  - 同场景换节点 → 与本节点说话人合并（**上限 2**，超出按 CAST_PRIORITY 让位）；
    *  - 节点显式 `cast` → 直接采用（用于「人散了」这类同场景内离场）；
    *  - 旁白行不动 cast → 旁白时立绘不消失。
    * 只收「能站上舞台」的角色（有立绘、非第一人称主角）；阿鲟也算角色。
@@ -340,7 +340,8 @@ export function useStoryEngine() {
     } else if (prevScene !== undefined && prevScene !== n.scene) {
       cast.value = limitCast(nodeSpeakers)
     } else {
-      cast.value = limitCast([...cast.value, ...nodeSpeakers])
+      // 同场景合并：**本节点说话人先占位**（说谁就看见谁），余下名额按优先级补
+      cast.value = limitCast([...cast.value, ...nodeSpeakers], CAST_MAX, nodeSpeakers)
     }
     nodeId.value = id
     state.currentNodeId = id
@@ -747,7 +748,10 @@ export function useStoryEngine() {
       cast.value = limitCast(
         n.cast
           ? n.cast
-          : [...new Set([...(prevSameScene ? speakersOf(prevSameScene) : []), ...speakersOf(n)])]
+          : [...new Set([...(prevSameScene ? speakersOf(prevSameScene) : []), ...speakersOf(n)])],
+        CAST_MAX,
+        // 与 enterNode 同规则：本节点说话人先占位
+        n.cast ? n.cast : speakersOf(n)
       )
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       if (data.phase === 'ai') {
