@@ -201,6 +201,12 @@ try {
 
   await send('Runtime.enable')
   await send('Page.enable')
+  // 无头浏览器把音频响应当成下载会污染系统「下载/音乐」目录——一律拒绝
+  try {
+    await send('Page.setDownloadBehavior', { behavior: 'deny' })
+  } catch {
+    /* 旧版 CDP 无此命令，忽略 */
+  }
   await send('Emulation.setDeviceMetricsOverride', {
     width: 1600,
     height: 900,
