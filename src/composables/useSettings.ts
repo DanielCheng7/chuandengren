@@ -59,6 +59,13 @@ function load(): Settings {
 /** 全应用共享同一份设置（模块级单例，避免多组件各自持有副本） */
 let singleton: SettingsBundle | null = null
 
+/**
+ * 全局字号基准倍率（叠加在玩家档位之上）。
+ * 2026-10-19 用户要求「默认字体再改大」：对白 20px → 22px、字卡 22px → 24.2px，
+ * 对白框高度随 `--font-scale` 等比联动，不必逐处改 px。
+ */
+const FONT_BASE = 1.1
+
 export interface SettingsBundle {
   settings: Settings
   enterDemoMode: () => void
@@ -88,9 +95,16 @@ function createSettings(): SettingsBundle {
     { deep: true, immediate: true }
   )
 
-  /** 字号缩放写入全局变量（--font-scale）：正文、对白框高度与字卡等比联动 */
+  /**
+   * 字号缩放写入全局变量（--font-scale）：正文、对白框高度与字卡等比联动。
+   * 在玩家档位（小 0.9 / 标准 1 / 大 1.2）之上再乘一个**全局基准**——
+   * 2026-10-19 用户要求「默认字体再改大」：整体 +10%，三档语义不变、旧存档无需迁移。
+   */
   function applyFontScale() {
-    document.documentElement.style.setProperty('--font-scale', String(settings.fontScale))
+    document.documentElement.style.setProperty(
+      '--font-scale',
+      String(settings.fontScale * FONT_BASE)
+    )
   }
 
   applyFontScale()
