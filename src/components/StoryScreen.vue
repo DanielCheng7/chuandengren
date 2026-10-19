@@ -209,6 +209,9 @@ function scheduleCardAdvance() {
   clearCardTimer()
   if (phase.value !== 'lines') return
 
+  // 覆盖层（回看／设置／调试面板）打开时挂起自动推进——关掉后由 watch 重新计时
+  if (overlayOpen.value) return
+
   // 道具亮相：注视节奏更缓，2.2–4.6s 逐行推进（点击可跳过整段中的当前行）
   const it = currentItem.value
   if (it) {
@@ -221,19 +224,42 @@ function scheduleCardAdvance() {
   }
 
   const card = currentSceneCard.value
-  if (!card) return
-  const chars = Array.from(card.text).length
-  // 序章蒙太奇节奏更缓：每屏停留 +2s（2026-10-18 用户决议）
-  const montageExtra = e.node.value?.kind === 'montage' ? 2000 : 0
-  const delay = Math.min(7500, Math.max(2500, 1500 + chars * 130)) + montageExtra
+  if (card) {
+    const chars = Array.from(card.text).length
+    // 序章蒙太奇节奏更缓：每屏停留 +2s（2026-10-18 用户决议）
+    const montageExtra = e.node.value?.kind === 'montage' ? 2000 : 0
+    const delay = Math.min(7500, Math.max(2500, 1500 + chars * 130)) + montageExtra
+    cardTimer = window.setTimeout(() => {
+      if (phase.value === 'lines' && currentSceneCard.value) e.advance()
+    }, delay)
+    return
+  }
+
+  // 普通台词／旁白：仅在「自动播放」开启时推进（字卡与道具原本就走自动节奏，不叠加）
+  if (!settings.autoPlay) return
+  const chars = Array.from(displayLine.value?.text ?? '').length
+  // 打字机耗时 + 阅读停留（≥1.4s，长句最多 3.2s）——先算打字，避免半行被跳走
+  const typeMs = settings.typewriter ? chars * settings.typewriterSpeed : 0
+  const holdMs = Math.min(3200, Math.max(1400, 1200 + chars * 25))
   cardTimer = window.setTimeout(() => {
-    if (phase.value === 'lines' && currentSceneCard.value) e.advance()
-  }, delay)
+    if (phase.value === 'lines' && !currentItem.value && !currentSceneCard.value) e.advance()
+  }, typeMs + holdMs)
 }
 
 // 行 / 节点 / 阶段变化时重排（手动点击推进同样触发，自动取消旧计时）
 watch([phase, () => e.nodeId.value, () => e.lineIndex.value], scheduleCardAdvance, {
   immediate: true,
+})
+
+// 开关自动播放、关掉覆盖层 → 重新起算（否则要么白等旧计时，要么永远停住）
+watch([() => settings.autoPlay, overlayOpen], scheduleCardAdvance)
+
+/**
+ * 选项／自由输入＝必须由玩家决定的一刻：**关闭**自动播放（不是暂停），
+ * 选完之后也不恢复——避免玩家离开时替他选掉分支。
+ */
+watch(phase, (p) => {
+  if ((p === 'choice' || p === 'input') && settings.autoPlay) settings.autoPlay = false
 })
 
 /* ---------- 推进与隐藏界面 ---------- */
@@ -466,6 +492,20 @@ onUnmounted(() => {
               @click="e.jumpTo('END')"
             >
               跳过现实篇
+            </button>
+            <button
+              class="tool touch-44"
+              :class="{ 'is-on': settings.autoPlay }"
+              type="button"
+              :aria-pressed="settings.autoPlay"
+              :title="
+                settings.autoPlay
+                  ? '自动播放中：点击关闭（遇选项会自动关闭）'
+                  : '自动逐行推进正文（遇选项自动关闭）'
+              "
+              @click.stop="settings.autoPlay = !settings.autoPlay"
+            >
+              自动
             </button>
             <button class="tool touch-44" type="button" @click="showHistory = true">回看</button>
             <button class="tool touch-44" type="button" @click="e.restart()">重新开始</button>
@@ -808,6 +848,13 @@ onUnmounted(() => {
   color: var(--gold);
   background: rgba(232, 163, 61, 0.1);
   border-color: rgba(232, 163, 61, 0.38);
+}
+
+/* 自动播放开启态：烛光橙（与「跳过序章」的暖金区分），常亮表示正在自动推进 */
+.tool.is-on {
+  color: var(--candle);
+  background: rgba(255, 182, 92, 0.12);
+  border-color: rgba(255, 182, 92, 0.42);
 }
 
 /* 触屏：放大视觉尺寸（配合 .touch-44 外扩热区） */

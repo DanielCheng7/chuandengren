@@ -20,6 +20,11 @@ export interface Settings {
   showDevPanel: boolean
   /** 主音量 0–100（0 = 静音；驱动 BGM 与入场 CG 原声，见 useAudio.ts） */
   volume: number
+  /**
+   * 自动播放（galgame 的 AUTO）：逐行自动推进正文。
+   * 遇选项／自由输入触点时**自动关闭**，玩家做出选择后也不恢复（防"手离开也替他选"）。
+   */
+  autoPlay: boolean
   /** 正文字号缩放（小 0.9 / 标准 1 / 大 1.2，写入全局 --font-scale） */
   fontScale: number
 }
@@ -34,6 +39,7 @@ function defaults(): Settings {
     showChoiceIds: false,
     showDevPanel: false,
     volume: 70,
+    autoPlay: false,
     fontScale: 1,
   }
 }
@@ -42,7 +48,9 @@ function load(): Settings {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return defaults()
-    return { ...defaults(), ...(JSON.parse(raw) as Partial<Settings>) }
+    // autoPlay 属「本次播放模式」而非偏好：不跨会话记忆，
+    // 免得玩家下次打开发现剧情自己在走（遇选项还会自己关掉，观感很怪）
+    return { ...defaults(), ...(JSON.parse(raw) as Partial<Settings>), autoPlay: false }
   } catch {
     return defaults()
   }
@@ -75,7 +83,9 @@ function createSettings(): SettingsBundle {
         /* 忽略写入失败 */
       }
     },
-    { deep: true }
+    // immediate：把「载入时被强制关闭」的 autoPlay 立刻写回，
+    // 免得存档里留着一个与运行时不一致的 true
+    { deep: true, immediate: true }
   )
 
   /** 字号缩放写入全局变量（--font-scale）：正文、对白框高度与字卡等比联动 */
