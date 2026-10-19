@@ -18,7 +18,7 @@ export interface Settings {
   showChoiceIds: boolean
   /** 显示开发调试面板 */
   showDevPanel: boolean
-  /** 主音量 0–100（音频素材接入后生效，0 = 静音） */
+  /** 主音量 0–100（0 = 静音；驱动 BGM 与入场 CG 原声，见 useAudio.ts） */
   volume: number
   /** 正文字号缩放（小 0.9 / 标准 1 / 大 1.2，写入全局 --font-scale） */
   fontScale: number

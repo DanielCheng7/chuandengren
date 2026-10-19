@@ -3,11 +3,12 @@
  * 《传灯人》互动叙事网页原型
  * 屏幕路由：标题页 →（渐隐·黑场）→ 开场 CG → 剧情页 → 结局页
  */
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import EndingScreen from './components/EndingScreen.vue'
 import OpeningCg from './components/OpeningCg.vue'
 import StoryScreen from './components/StoryScreen.vue'
 import TitleScreen from './components/TitleScreen.vue'
+import { useAudio } from './composables/useAudio'
 import { useStoryEngine } from './composables/useStoryEngine'
 
 const engine = useStoryEngine()
@@ -49,6 +50,25 @@ function finishCg() {
 
 /** 标题页仅在「开场流程未启动且处于标题态」时存在；fade 阶段由 Transition 播放渐隐 */
 const showTitle = computed(() => cgStage.value === 'idle' && view.value === 'title')
+
+/**
+ * BGM 驱动：标题页 → 标题曲；CG／黑场 → 静音让位（`开场CG.mp4` 自带音轨，避免双层配乐）；
+ * 剧情与结局 → 剧情曲（结局沿用不切曲，免得把情绪掐断）。
+ */
+const { playBgm, suspendBgm, resumeBgm } = useAudio()
+
+watch(
+  [cgStage, view],
+  ([stage, v]) => {
+    if (stage !== 'idle') {
+      suspendBgm()
+      return
+    }
+    resumeBgm()
+    playBgm(v === 'title' ? 'title' : 'story')
+  },
+  { immediate: true }
+)
 
 onUnmounted(() => stageTimers.forEach((t) => window.clearTimeout(t)))
 </script>
