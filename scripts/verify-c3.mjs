@@ -343,7 +343,7 @@ try {
     const cur = await ev(`(() => {
       const nm = document.querySelector('.dbox .name')?.textContent?.trim() || '';
       const tx = document.querySelector('.dbox .text')?.textContent?.trim() || '';
-      const img = document.querySelector('.char-layer img');
+      const img = document.querySelector('.char-stage .char.is-ashun img'); // 只取阿鲟独立档位
       const s = JSON.parse(localStorage.getItem('chuandengren.save.v4')||'{}');
       // 名字色 → rgb（CSS 变量是 hex）
       const hex2rgb = (h) => { const x = (h||'').trim().replace('#',''); const n = parseInt(x.length===3?x.split('').map(c=>c+c).join(''):x,16); return isNaN(n)?'':\`rgb(\${(n>>16)&255}, \${(n>>8)&255}, \${n&255})\` };

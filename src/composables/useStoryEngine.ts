@@ -24,6 +24,7 @@
 import { computed, reactive, ref } from 'vue'
 import { START_NODE_ID, getNode, nodeProgress } from '@/data/story'
 import { useSettings } from '@/composables/useSettings'
+import { canStandOnStage } from '@/data/characters'
 import { ASHUN_FALLBACK_LINES } from '@/data/fallbackDialogue'
 import { buildStanceReportLine } from '@/utils/report'
 import {
@@ -156,6 +157,17 @@ export function useStoryEngine() {
   const chapter = computed(() => node.value?.chapter ?? '')
   const sectionTitle = computed(() => node.value?.sectionTitle ?? '')
   const sceneKey = computed(() => node.value?.scene ?? 'lantern_workshop')
+
+  /**
+   * 在场人物（立绘常驻，2026-10-19 用户要求与市面 galgame 一致）：
+   * 立绘不随「这一行是谁在说」闪进闪出，而是**一场戏里持续在场**——
+   *  - 换场景 → 按新节点重建（旧场景的人不跟过去）；
+   *  - 同场景换节点 → 与本节点说话人合并（上限 3，超出丢最早的）；
+   *  - 节点显式 `cast` → 直接采用（用于「人散了」这类同场景内离场）；
+   *  - 旁白行不动 cast → 旁白时立绘不消失。
+   * 只收「能站上舞台」的角色（有立绘、非主角知遥、非阿鲟）。
+   */
+  const cast = ref<string[]>([])
 
   /* ---------------- 内部工具 ---------------- */
   /**
@@ -318,6 +330,18 @@ export function useStoryEngine() {
     }
     clearHoldTimer()
     missingNodeId.value = null
+    // 在场人物：换场景重建／同场景合并／显式 cast 覆盖（见 cast 的注释）
+    const prevScene = node.value?.scene
+    const nodeSpeakers = n.lines
+      .filter((l) => (l.type === 'dialogue' || l.type === 'sms') && canStandOnStage(l.speaker))
+      .map((l) => l.speaker as string)
+    if (n.cast) {
+      cast.value = n.cast.filter((s) => canStandOnStage(s))
+    } else if (prevScene !== undefined && prevScene !== n.scene) {
+      cast.value = [...new Set(nodeSpeakers)].slice(0, 3)
+    } else {
+      cast.value = [...new Set([...cast.value, ...nodeSpeakers])].slice(-3)
+    }
     nodeId.value = id
     state.currentNodeId = id
     if (!state.visitedNodes.includes(id)) state.visitedNodes.push(id)
@@ -709,6 +733,16 @@ export function useStoryEngine() {
       // 旧存档没有 missingNodeId：从当前节点的下一步反推，断点屏才不会显示空节点号
       if (data.phase === 'break' && !missingNodeId.value) missingNodeId.value = n.nextNodeId ?? null
       lines.value = resolveNodeLines(n)
+      // 在场人物同样要重建，否则刷新后立绘会空一屏
+      cast.value = n.cast
+        ? n.cast.filter((sp) => canStandOnStage(sp))
+        : [
+            ...new Set(
+              n.lines
+                .filter((l) => (l.type === 'dialogue' || l.type === 'sms') && canStandOnStage(l.speaker))
+                .map((l) => l.speaker as string)
+            ),
+          ].slice(0, 3)
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       if (data.phase === 'ai') {
         // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用判定
@@ -761,6 +795,7 @@ export function useStoryEngine() {
     chapter,
     sectionTitle,
     sceneKey,
+    cast,
     history,
     freeInputDone,
     aiStatus,

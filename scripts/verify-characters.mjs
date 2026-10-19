@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 /**
- * 角色立绘接入验收：素材加载 + 位置 + 尺寸 + 缺素材不渲染
+ * 角色立绘验收：常驻在场（galgame 式）+ 版式（参考图比例）+ 场景切换 + 缺素材降级
  *
  * 用法：node scripts/verify-characters.mjs [url] [outDir]
  *   默认 url = http://127.0.0.1:4173/；开发期可传 http://127.0.0.1:5173/
  *
- * 验证点（《素材落位规范》§3 / 《开发文档》§4.1）：
- *   ① 五个角色立绘都能加载（naturalWidth > 0），且都是透明底 WebP；
- *   ② 立绘在右侧、**人物脚不被对白带压住**（img 底边 ≤ 对白带顶边）；
- *   ③ 立绘高度不超过画幅 52%（不压住画面中心）；
- *   ④ 切换说话人时立绘随之切换（阿禾 → 九婆）；
- *   ⑤ 无立绘配置的说话人（管理员）**整层不渲染**（不出现空立绘框）；
- *   ⑥ 阿鲟走独立档位（is-ashun，横卧鱼灯）；
- *   ⑦ 全程无 console 报错。
+ * 验证点（2026-10-19 用户要求：立绘整场常驻，不在旁白时消失）：
+ *   ① 进场景即有立绘（不等第一句台词）；
+ *   ② **旁白行立绘不消失**：C1-2 逐行采样，场上有名字的 11 行里立绘数量恒为 1；
+ *   ③ 版式对齐参考图：单人 ≈92vh、靠右、底边越过对白带顶（腿部被裁）且不出画；
+ *   ④ 换场景重建：夜市摊（只有阿鲟）→ 无人物立绘；
+ *   ⑤ 双人分列不重叠（E1：九婆 + 阿禾）；
+ *   ⑥ 三人分列不重叠（C3-2：九婆 + 阿禾 + 周经理）；
+ *   ⑦ 无立绘角色（管理员）不留空框；阿鲟走独立档位；
+ *   ⑧ 移动端竖屏不出画、不压对白。
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -100,22 +101,20 @@ try {
     writeFileSync(join(OUT, name + '.png'), Buffer.from(r.data, 'base64'))
   }
   const SAVE = 'chuandengren.save.v4'
-  const snap = () =>
+  const probe = () =>
     ev(`(() => {
       const s = JSON.parse(localStorage.getItem('${SAVE}')||'{}');
-      const layer = document.querySelector('.char-layer');
-      const img = layer?.querySelector('img');
-      const bottom = document.querySelector('.bottom');
+      const imgs = [...document.querySelectorAll('.char-stage .char img')];
+      const rects = imgs.map((i) => { const r = i.getBoundingClientRect();
+        return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height),
+                 bottom: Math.round(r.bottom), right: Math.round(r.right), src: i.getAttribute('src') }; });
       const dbox = document.querySelector('.dbox');
-      const r = (el) => el ? el.getBoundingClientRect() : null;
-      const pick = (el) => el ? { x: Math.round(r(el).x), y: Math.round(r(el).y), w: Math.round(r(el).width), h: Math.round(r(el).height), bottom: Math.round(r(el).bottom) } : null;
       return {
         nodeId: s.nodeId, phase: s.phase,
         name: document.querySelector('.dbox .name')?.textContent?.trim() || '',
-        layer: pick(layer), img: pick(img),
-        imgSrc: img?.getAttribute('src') || '', naturalW: img?.naturalWidth || 0, naturalH: img?.naturalHeight || 0,
-        isAshun: !!layer?.classList.contains('is-ashun'),
-        dboxTop: dbox ? Math.round(r(dbox).y) : null,
+        text: document.querySelector('.dbox .text')?.textContent?.trim() || '',
+        count: imgs.length, rects,
+        dboxTop: dbox ? Math.round(dbox.getBoundingClientRect().y) : null,
         vh: window.innerHeight, vw: window.innerWidth,
       };
     })()`)
@@ -150,14 +149,14 @@ try {
     await ev(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'D', shiftKey: true }))`)
     await sleep(250)
   }
-  /** 推进直到某一说话人正在说话（遇选项／触点自动作答，不卡在 C1-3） */
-  const waitSpeaker = async (who, timeout = 90000) => {
+  /** 推进到指定节点（遇选项／触点自动作答） */
+  const advanceToNode = async (ids, timeout = 90000) => {
     const t0 = Date.now()
     while (Date.now() - t0 < timeout) {
-      const s = await snap()
-      if (s?.name && s.name.includes(who)) {
-        await sleep(420) // 等立绘淡入
-        return await snap()
+      const s = await probe()
+      if (s && ids.includes(s.nodeId)) {
+        await sleep(360)
+        return await probe()
       }
       if (s?.phase === 'choice') {
         await sleep(450)
@@ -172,9 +171,22 @@ try {
         continue
       }
       await tap()
-      await sleep(180)
+      await sleep(175)
     }
     return null
+  }
+  /** 逐行采样一个节点（直到 nodeId 变化），返回每行的立绘数量与是否旁白 */
+  const sampleNode = async (stopIds, max = 30) => {
+    const rows = []
+    for (let i = 0; i < max; i++) {
+      const s = await probe()
+      if (!s) break
+      if (s.nodeId && stopIds.includes(s.nodeId) && rows.length > 0) break
+      rows.push({ name: s.name, count: s.count, text: s.text.slice(0, 12) })
+      await tap()
+      await sleep(190)
+    }
+    return rows
   }
 
   await send('Runtime.enable')
@@ -186,61 +198,138 @@ try {
     mobile: false,
   })
 
-  /* ===== 阿禾（C1-2 第一次说话） ===== */
+  /* ===== A. 旁白常驻：C1-2 整节点逐行采样 ===== */
   await freshBoot()
   await jumpTo('C1-1')
-  const ahe = await waitSpeaker('阿禾')
+  const c12 = await advanceToNode(['C1-2'])
+  await shot('01-solo-ahe') // 先截单人版式（下次推进会到 C1-3，那里是街景无立绘）
+  const rows = await sampleNode(['C1-3'])
+  const narRows = rows.filter((r) => !r.name)
+  const allOne = rows.every((r) => r.count === 1)
   check(
-    '① 阿禾立绘加载成功（char-ahe.webp）',
-    !!ahe && ahe.naturalW > 0 && ahe.imgSrc.includes('char-ahe'),
-    `src=${ahe?.imgSrc} 自然尺寸=${ahe?.naturalW}x${ahe?.naturalH}`
+    '① 进 C1-2 即有立绘（不等第一句台词）',
+    c12?.count === 1 && (c12?.rects[0].src || '').includes('char-ahe'),
+    `首行立绘数=${c12?.count}`
   )
   check(
-    '② 立绘在右侧且高度 ≤ 画幅 52%',
-    !!ahe?.img && ahe.img.x > ahe.vw * 0.5 && ahe.img.h <= ahe.vh * 0.53,
-    `x=${ahe?.img?.x}/${ahe?.vw} 高=${ahe?.img?.h}/${ahe?.vh}`
+    '② 旁白行立绘不消失（整节点恒 1 人）',
+    rows.length >= 8 && allOne && narRows.length >= 3,
+    `采样 ${rows.length} 行，其中旁白 ${narRows.length} 行；各行立绘数=${[...new Set(rows.map((r) => r.count))].join('/')}`
   )
-  check(
-    '③ 人物脚不被对白带压住（img 底边 ≤ 对白框顶边）',
-    !!ahe?.img && !!ahe?.dboxTop && ahe.img.bottom <= ahe.dboxTop + 2,
-    `img底=${ahe?.img?.bottom} 对白框顶=${ahe?.dboxTop}`
-  )
-  await shot('01-ahe')
 
-  /* ===== 九婆（C1-5 收束段） ===== */
-  const jiu = await waitSpeaker('九婆', 90000)
+  /* ===== B. 版式：单人 92vh、靠右、腿部被对白带裁 ===== */
+  const solo = c12?.rects[0]
   check(
-    '④ 切换说话人时立绘随之切换（→ 九婆）',
-    !!jiu && jiu.naturalW > 0 && jiu.imgSrc.includes('char-jiupo'),
-    `src=${jiu?.imgSrc}`
+    '③ 版式对齐参考图：≈88vh、靠右、水平不出画、底边越过对白带（腿被裁）',
+    !!solo &&
+      solo.h >= (c12.vh * 0.84) &&
+      solo.h <= c12.vh * 0.96 &&
+      solo.x > c12.vw * 0.5 &&
+      solo.x >= 0 &&
+      solo.right <= c12.vw + 1 &&
+      solo.bottom > (c12.dboxTop ?? 0),
+    `图 ${solo?.w}x${solo?.h} @ x=${solo?.x} 底=${solo?.bottom} 对白顶=${c12?.dboxTop} 视高=${c12?.vh}`
   )
-  await shot('02-jiupo')
 
-  /* ===== 管理员：无立绘配置 → 整层不渲染 ===== */
+  /* ===== C. 换场景重建：夜市摊只有阿鲟 → 无人物立绘 ===== */
   await freshBoot()
   await jumpTo('C1-1')
-  const admin = await waitSpeaker('管理员', 90000)
+  await advanceToNode(['C1-3'])
+  await sleep(500)
+  await ev(`[...document.querySelectorAll('.btn.choice:not([disabled])')].find(b=>b.textContent.includes('夜市摊'))?.click()`)
+  const night = await advanceToNode(['C1-4c'])
+  await sleep(400)
+  const nightNow = await probe()
   check(
-    '⑤ 无立绘角色（管理员）不渲染空立绘框',
-    !!admin && admin.name.includes('管理员') && (!admin.layer || admin.naturalW === 0),
-    `name=${admin?.name} layer=${admin?.layer ? '存在' : '无'}`
+    '④ 换场景重建：夜市摊（只阿鲟说话）无人物立绘',
+    !!night && nightNow?.count === 0,
+    `node=${nightNow?.nodeId} 人物立绘=${nightNow?.count}`
   )
-  await shot('03-no-portrait')
+  await shot('02-night-stall')
 
-  /* ===== 阿鲟：独立档位 ===== */
+  /* ===== D. 双人分列（E1：九婆 + 阿禾） ===== */
+  await freshBoot()
+  await jumpTo('E1')
+  const duo = await advanceToNode(['E1'])
+  await sleep(500)
+  const duoNow = await probe()
+  const noOverlap2 =
+    duoNow?.count === 2 && duoNow.rects[0].right <= duoNow.rects[1].x + 8
+  check(
+    '⑤ 双人分列不重叠（E1 九婆＋阿禾）',
+    !!duo && duoNow?.count === 2 && noOverlap2,
+    duoNow?.rects?.map((r) => `${r.src.split('/').pop()}@${r.x}-${r.right}`).join(' | ') || '无'
+  )
+  await shot('03-duo-e1')
+
+  /* ===== E. 三人分列（C3-2：九婆 + 阿禾 + 周经理） ===== */
+  await freshBoot()
+  await jumpTo('C3-1')
+  const trio = await advanceToNode(['C3-2'])
+  await sleep(500)
+  const trioNow = await probe()
+  const xs = (trioNow?.rects ?? []).map((r) => r.x).sort((a, b) => a - b)
+  const noOverlap3 = xs.length === 3 && xs[1] - xs[0] > 100 && xs[2] - xs[1] > 100
+  check(
+    '⑥ 三人分列不重叠（C3-2 围坐）',
+    !!trio && trioNow?.count === 3 && noOverlap3,
+    `${trioNow?.count} 人 @ x=${xs.join('/')}`
+  )
+  await shot('04-trio-c3-2')
+
+  /* ===== E2. 同场景内离场：C3-8 三人 → C3-A 只剩九婆与阿禾 ===== */
+  await freshBoot()
+  await jumpTo('C3-1')
+  await advanceToNode(['C3-8'], 120000)
+  await sleep(400)
+  const beforeLeave = await probe()
+  await advanceToNode(['C3-A'], 60000)
+  await sleep(400)
+  const afterLeave = await probe()
+  check(
+    '⑥-2 同场景内「人散了」：周经理退场（3 人 → 2 人）',
+    beforeLeave?.count === 3 && afterLeave?.count === 2 && afterLeave?.nodeId === 'C3-A',
+    `C3-8=${beforeLeave?.count} 人 → C3-A=${afterLeave?.count} 人`
+  )
+  await shot('05-leave-c3a')
+
+  /* ===== F. 管理员无框 + 阿鲟独立档位 ===== */
   await freshBoot()
   await jumpTo('C1-1')
-  const ashun = await waitSpeaker('阿鲟', 120000)
+  await advanceToNode(['C1-3'])
+  await sleep(500)
+  await ev(`[...document.querySelectorAll('.btn.choice:not([disabled])')].find(b=>b.textContent.includes('文化馆'))?.click()`)
+  await advanceToNode(['C1-4a'])
+  await sleep(400)
+  const adminNow = await probe()
   check(
-    '⑥ 阿鲟走独立档位（is-ashun 横卧鱼灯）',
-    !!ashun && ashun.isAshun === true && ashun.imgSrc.includes('char-ashun') && ashun.naturalW > 0,
-    `isAshun=${ashun?.isAshun} src=${ashun?.imgSrc} ${ashun?.naturalW}x${ashun?.naturalH}`
+    '⑦ 无立绘角色（管理员）不留空框',
+    adminNow?.name.includes('管理员') && adminNow?.count === 0,
+    `name=${adminNow?.name} 立绘=${adminNow?.count}`
   )
-  await shot('04-ashun')
+  await shot('05-no-portrait')
 
-  check('⑦ 全程无 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
+  await freshBoot()
+  await jumpTo('C1-1')
+  // 走到 C1-4a（管理员那处）后继续点，直到阿鲟开口——它只在说话时浮出
+  await advanceToNode(['C1-4a'], 120000)
+  for (let i = 0; i < 12; i++) {
+    const has = await ev(`!!document.querySelector('.char-stage .char.is-ashun img')`)
+    if (has) break
+    await tap()
+    await sleep(200)
+  }
+  const ashunProbe = await ev(`(() => {
+    const el = document.querySelector('.char-stage .char.is-ashun img');
+    return el ? { w: el.naturalWidth, h: el.naturalHeight, src: el.getAttribute('src') } : null;
+  })()`)
+  check(
+    '⑧ 阿鲟走独立档位（横卧鱼灯，不占人物位）',
+    !!ashunProbe && ashunProbe.src.includes('char-ashun') && ashunProbe.w > 0,
+    ashunProbe ? `${ashunProbe.src} ${ashunProbe.w}x${ashunProbe.h}` : '未出现'
+  )
 
-  /* ===== 移动端竖屏（390×844）：立绘不出画、不压对白、不占掉半幅 ===== */
+  /* ===== G. 移动端 ===== */
   await send('Emulation.setDeviceMetricsOverride', {
     width: 390,
     height: 844,
@@ -249,18 +338,18 @@ try {
   })
   await freshBoot()
   await jumpTo('C1-1')
-  const m = await waitSpeaker('阿禾')
+  const m = await advanceToNode(['C1-2'])
+  await sleep(400)
+  const mNow = await probe()
+  const mRect = mNow?.rects?.[0]
   check(
-    '⑧ 移动端竖屏：立绘在画幅内、脚不被压、宽度占比合理',
-    !!m?.img &&
-      m.img.x >= 0 &&
-      m.img.x + m.img.w <= m.vw + 1 &&
-      m.img.bottom <= (m.dboxTop ?? 1e9) + 2 &&
-      m.img.h <= m.vh * 0.56 &&
-      m.img.w <= m.vw * 0.45,
-    `图 ${m?.img?.w}x${m?.img?.h} @ x=${m?.img?.x} 视口 ${m?.vw}x${m?.vh} 底=${m?.img?.bottom}/对白顶=${m?.dboxTop}`
+    '⑨ 移动端竖屏：不出画、腿部仍被对白带裁',
+    !!mRect && mRect.x >= -2 && mRect.right <= mNow.vw + 2 && mRect.bottom > (mNow.dboxTop ?? 0),
+    `图 ${mRect?.w}x${mRect?.h} @ ${mRect?.x}-${mRect?.right} 视口 ${mNow?.vw}`
   )
-  await shot('05-mobile-ahe')
+  await shot('06-mobile')
+
+  check('⑩ 全程无 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 
   const failed = results.filter((r) => !r.ok)
   console.log('\n=== 汇总 ===')

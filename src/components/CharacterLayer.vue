@@ -1,67 +1,142 @@
 <script setup lang="ts">
 /**
- * 人物立绘层（制作计划 §0.4）
- * 有素材才显示；缺素材时整层不渲染 —— 不出现空立绘框。
- * 素材：public/assets/characters/char-*.webp（**透明底竖图，人物高占图高 ≈96%**，
- * 由 `scripts/import-characters.py` 从 16:9 全身像裁出；不强制 2:3）
+ * 人物立绘层（V3.0，2026-10-19 按 galgame 惯例重做）
  *
- * 尺寸按**视高**定（2026-10-19 接入实测调整）：原先 `min(52%, 420px)` 是相对
- * `.props`（已被对白带压掉一截），实际只有视高 41%，全身像显得空；
- * 改为 `min(52vh, 520px)`，脚底再留 6px 缝，不压对白带。
+ * **常驻在场**：立绘不再跟着"这一行是谁在说"闪进闪出，而是由引擎的 `cast`（在场人物）
+ * 决定——整场戏里持续显示，只在换场景或人物离场时切换／消失。旁白行不影响立绘。
  *
- * 阿鲟例外：它是横卧的鱼灯（约 2:1），不能套竖立绘的档位——
- * 单独一档尺寸与位置（右侧偏上、悬空轻浮），素材见 `char-ashun.webp`。
+ * **版式（对齐参考图）**：人物放大到接近满幅（1 人 92vh、2 人 88vh、3 人 78vh），
+ * 底边下探 4vh，让腿部被对白带裁掉；1 人靠右中、2 人左右分列、3 人左中右均分。
+ *
+ * **层级**：本层挂在 `.story` 下（不在可滚动的 `.stage` 里），z-index 低于舞台，
+ * 因此对白带会自然盖住人物下半身，且不会给舞台添滚动条。
+ *
+ * **缺素材**：某个角色立绘 404 → 只剔除该角色，其余照常显示；全部失败则整层不渲染。
+ * 阿鲟是横卧鱼灯（约 2:1），走独立档位，不参与并排布局。
  */
-import { computed, ref, watch } from 'vue'
-import { getCharacter } from '@/data/characters'
+import { computed, ref } from 'vue'
+import { canStandOnStage, getCharacter } from '@/data/characters'
 
-const props = defineProps<{ speaker?: string }>()
+const props = defineProps<{
+  /** 在场人物（引擎 cast，已过滤过主角/阿鲟） */
+  cast?: string[]
+  /** 当前说话人（只用于判断阿鲟是否在场） */
+  speaker?: string
+}>()
 
-const ok = ref(true)
-const def = computed(() => getCharacter(props.speaker))
-const src = computed(() => (def.value?.asset ? `/assets/characters/${def.value.asset}` : ''))
-const show = computed(() => !!src.value && ok.value)
-/** 阿鲟：横卧鱼灯，单独一档 */
-const isAshun = computed(() => props.speaker === '阿鲟')
+/** 加载失败的角色（按角色记，切换场景不清空——文件缺失是持久状态） */
+const broken = ref<string[]>([])
 
-watch(
-  () => props.speaker,
-  () => {
-    ok.value = true
-  }
+const srcOf = (who: string) => {
+  const def = getCharacter(who)
+  return def?.asset ? `/assets/characters/${def.asset}` : ''
+}
+
+/** 场上人物：过滤可站立角色 + 去掉加载失败的 */
+const standers = computed(() =>
+  (props.cast ?? [])
+    .filter((who) => canStandOnStage(who) && srcOf(who) && !broken.value.includes(who))
+    .slice(0, 3)
 )
+
+/** 阿鲟：只在它说话时浮出（鱼灯小窗，不算"站位"） */
+const ashunOn = computed(() => props.speaker === '阿鲟' && !broken.value.includes('阿鲟'))
+
+const total = computed(() => standers.value.length)
 </script>
 
 <template>
-  <div v-if="show" class="char-layer anim-fade" :class="{ 'is-ashun': isAshun }">
-    <img :src="src" :alt="def?.name" @error="ok = false" />
+  <div v-if="total > 0 || ashunOn" class="char-stage">
+    <!-- 人物：1 人靠右中；2 人左右分列；3 人左中右 -->
+    <div
+      v-for="(who, i) in standers"
+      :key="who"
+      class="char"
+      :class="[`n${total}`, `i${i}`]"
+    >
+      <img
+        :src="srcOf(who)"
+        :alt="getCharacter(who)?.name"
+        @error="broken.push(who)"
+      />
+    </div>
+
+    <!-- 阿鲟：横卧鱼灯，右侧偏上悬空 -->
+    <div v-if="ashunOn" class="char is-ashun">
+      <img
+        :src="srcOf('阿鲟')"
+        alt="阿鲟"
+        @error="broken.push('阿鲟')"
+      />
+    </div>
   </div>
 </template>
 
 <style scoped>
-.char-layer {
+/* 整层覆盖画面：挂在 .story 下、z-index 低于舞台，对白带会盖住人物下半身 */
+.char-stage {
   position: absolute;
-  right: 4%;
-  /* 脚底与对白带上沿留 6px 缝：人物是全身像，贴死会被渐变带切到鞋尖 */
-  bottom: 6px;
-  height: min(52vh, 520px);
+  inset: 0;
+  z-index: 3;
   pointer-events: none;
-  filter: drop-shadow(0 12px 26px rgba(0, 0, 0, 0.5));
+  overflow: hidden;
+  transition: opacity 0.32s ease;
 }
 
-img {
+/* ---------- 人物立绘 ---------- */
+.char {
+  position: absolute;
+  /* 底边下探：腿部被对白带裁掉（参考图效果）；素材底部留了 1% padding，不会切到鞋 */
+  bottom: -4vh;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+  filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.55));
+}
+
+.char img {
   height: 100%;
   width: auto;
   object-fit: contain;
-  opacity: 0.96;
-  /* 立绘统一压低一点亮度，避免比场景图更"跳" */
+  opacity: 0.97;
+  /* 统一压低一点亮度，避免比场景更"跳" */
   filter: brightness(0.94) saturate(0.96);
+}
+
+/* 1 人：靠右中（与参考图单人位一致，右侧留呼吸；不贴边） */
+.char.n1 {
+  height: min(88vh, 1060px);
+  right: 20%;
+}
+
+/* 2 人：左右分列，中间留出对话带 */
+.char.n2 {
+  height: min(84vh, 1000px);
+}
+.char.n2.i0 {
+  left: 16%;
+}
+.char.n2.i1 {
+  right: 16%;
+}
+
+/* 3 人：左中右均分，缩小一档避免重叠 */
+.char.n3 {
+  height: min(78vh, 900px);
+}
+.char.n3.i0 {
+  left: 4%;
+}
+.char.n3.i1 {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.char.n3.i2 {
+  right: 4%;
 }
 
 /* ---------- 阿鲟：横卧鱼灯（约 2:1）----------
    悬在画面右侧偏上，给底部对白带让位；轻微上下浮动像"漂"着。
-   浮动写在 img 上，避免覆盖外层 .anim-fade 的淡入。 */
-.char-layer.is-ashun {
+   浮动写在 img 上，避免覆盖外层过渡。 */
+.char.is-ashun {
   right: 5%;
   bottom: 22%;
   height: auto;
@@ -70,7 +145,7 @@ img {
     drop-shadow(0 0 32px rgba(255, 182, 92, 0.3));
 }
 
-.char-layer.is-ashun img {
+.char.is-ashun img {
   width: 100%;
   height: auto;
   filter: brightness(1.02) saturate(1.03);
@@ -87,9 +162,25 @@ img {
   }
 }
 
-/* 手机竖屏：更宽一档、稍微上移，避免贴到对白带 */
+/* 手机竖屏：略收一档，避免两人贴边 */
 @media (max-width: 640px) {
-  .char-layer.is-ashun {
+  .char.n1 {
+    height: min(84vh, 760px);
+    right: 4%;
+  }
+  .char.n2 {
+    height: min(80vh, 720px);
+  }
+  .char.n2.i0 {
+    left: -2%;
+  }
+  .char.n2.i1 {
+    right: -2%;
+  }
+  .char.n3 {
+    height: min(70vh, 640px);
+  }
+  .char.is-ashun {
     right: 2%;
     bottom: 24%;
     width: min(80vw, 420px);
@@ -97,7 +188,7 @@ img {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .char-layer.is-ashun img {
+  .char.is-ashun img {
     animation: none;
   }
 }

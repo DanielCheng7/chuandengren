@@ -253,6 +253,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-A｜守旧倾向｜先把活做扎实',
     scene: 'banyan_night',
+    // 「人陆续散了」：周经理与本场无关，只留九婆与阿禾（同场景内离场，需显式覆盖）
+    cast: ['九婆', '阿禾'],
     lines: [
       stage('【C3-A】守旧倾向｜先把手上的活做扎实（触发：守旧值 ＞ 创新值；自动进入，不设选项）'),
       stage('画面：banyan_night。人陆续散了，矮凳还围着一圈。竹架上那条半成品鳌鱼灯，从头到尾没点过。'),
@@ -285,6 +287,7 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-B｜创新倾向｜先让人看见',
     scene: 'banyan_night',
+    cast: ['九婆', '阿禾'],
     lines: [
       stage('【C3-B】创新倾向｜先让人看见（触发：创新值 ＞ 守旧值；自动进入，不设选项）'),
       stage('画面：banyan_night。人陆续散了。九婆把火柴推到桌子中间。他没接，先掏出手机，架在暖灯边上。'),
@@ -313,6 +316,7 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-C｜平衡倾向｜两头都伸一只手',
     scene: 'banyan_night',
+    cast: ['九婆', '阿禾'],
     lines: [
       stage('【C3-C】平衡倾向｜两头都伸一只手（触发：守旧值 ＝ 创新值；自动进入，不设选项）'),
       stage('画面：banyan_night。人陆续散了。九婆把火柴推过来。他一手接火柴，一手把手机架在暖灯边上。'),
@@ -339,6 +343,7 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-R｜倾向报告',
     scene: 'banyan_night',
+    cast: ['九婆', '阿禾'],
     kind: 'report',
     lines: [
       stage('【C3-R】倾向报告（★AI：模板取句，不调 AI 生成新句）'),

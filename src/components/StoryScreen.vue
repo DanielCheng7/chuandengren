@@ -336,6 +336,12 @@ watch(phase, scheduleChoicesReady)
       :backdrop="e.node.value?.backdrop"
     />
 
+    <!-- 人物立绘：**常驻在场**（2026-10-19 按 galgame 惯例重做）——
+         挂在 stage 之外、z-index 低于舞台：对白带自然盖住人物下半身，
+         也不会给可滚动的 .stage 添滚动条。在场人物由引擎 cast 决定，
+         旁白行不改变 cast，所以旁白时立绘不消失。 -->
+    <CharacterLayer :cast="e.cast.value" :speaker="speakerForLayer" />
+
     <!-- 幕间角标水印：仅幕（章）切换时浮出（2.4s 起落，UI 设计书 r4 §6）；
          普通场景切换不再浮出（2026-10-17 用户决议） -->
     <Watermark :key="e.chapter.value" />
@@ -343,8 +349,6 @@ watch(phase, scheduleChoicesReady)
     <!-- 舞台 -->
     <main class="stage" @click="onStageClick">
       <div class="props" :class="{ 'is-choosing': showChoices, 'is-inputting': showFreeInput }">
-        <CharacterLayer :speaker="speakerForLayer" />
-
         <!-- 抉择：出现在画面中央（2026-10-16 用户决议）；进出带柔和过渡（防闪屏） -->
         <Transition name="layer">
           <div v-if="showChoices" class="choice-layer">
@@ -515,6 +519,11 @@ watch(phase, scheduleChoicesReady)
 .overlay-open .stage {
   opacity: 0;
   pointer-events: none;
+}
+
+/* 覆盖层打开时立绘一起退到背景（保留一点轮廓，不做硬切） */
+.overlay-open :deep(.char-stage) {
+  opacity: 0.18;
 }
 
 .props {

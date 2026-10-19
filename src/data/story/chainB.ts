@@ -63,6 +63,8 @@ export const chainBNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'B3｜后续（把人请回来）',
     scene: 'workshop_next_year',
+    // 周经理本场是电话画外音，不站台；坊里只有阿禾
+    cast: ['阿禾'],
     lines: [
       stage('【B3】后续（把人请回来）'),
       stage(
