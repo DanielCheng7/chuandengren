@@ -19,6 +19,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
+import { AUDIO_MOCK } from './lib/audio-mock.mjs'
 
 const URL_ = process.argv[2] || 'http://127.0.0.1:4173/'
 const OUT = resolve(process.argv[3] || '.verify-c3')
@@ -171,6 +172,8 @@ try {
 
   await send('Runtime.enable')
   await send('Page.enable')
+  // 用静音 data URI 顶替真实 mp3：浏览器不发音频请求，IDM 之类的下载管理器不会弹窗
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: AUDIO_MOCK })
   // 无头浏览器把音频响应当成下载会污染系统「下载/音乐」目录——一律拒绝
   try {
     await send('Page.setDownloadBehavior', { behavior: 'deny' })

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { AUDIO_MOCK } from './lib/audio-mock.mjs'
 /**
  * 步骤 35 走查：C3-R 倾向报告（六档取句）＋ C4 结算节点（三分派 × 分层）
  *
@@ -185,6 +186,8 @@ try {
 
   await send('Runtime.enable')
   await send('Page.enable')
+  // 用静音 data URI 顶替真实 mp3：浏览器不发音频请求，IDM 之类的下载管理器不会弹窗
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: AUDIO_MOCK })
   // 无头浏览器把音频响应当成下载会污染系统「下载/音乐」目录——一律拒绝
   try {
     await send('Page.setDownloadBehavior', { behavior: 'deny' })
