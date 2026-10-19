@@ -15,7 +15,18 @@ import { useSettings } from './useSettings'
 
 export type BgmKey = 'title' | 'story'
 
+/**
+ * 走**无扩展名**的 `/media/*` 路由（Vite 中间件返回 `audio/mpeg`）：
+ * 装了 IDM 之类下载管理器时，插件按 `.mp3` 后缀抓取，直链会被弹窗甚至接管导致没声音；
+ * 去掉扩展名后它匹配不到，页面正常拿到音频。
+ */
 const SRC: Record<BgmKey, string> = {
+  title: '/media/bgm-title',
+  story: '/media/bgm-story',
+}
+
+/** 纯静态部署（无 Node 中间件）时回退到直链——只回退一次，仍失败才判定缺素材 */
+const SRC_FALLBACK: Record<BgmKey, string> = {
   title: '/assets/audio/bgm_title.mp3',
   story: '/assets/audio/bgm_story.mp3',
 }
@@ -58,11 +69,24 @@ function ensure(key: BgmKey): HTMLAudioElement | null {
   a.preload = key === 'title' ? 'metadata' : 'auto'
   a.volume = 0
   a.addEventListener('error', () => {
-    // 素材未落位：静默降级（不留空占位、不打扰玩家）
+    // ① 第一次失败：多半是无扩展名路由在纯静态部署下不存在 → 回退直链重试一次
+    if (!a.dataset.fallback) {
+      a.dataset.fallback = '1'
+      a.src = SRC_FALLBACK[key]
+      a.load()
+      if (current === key && !suspended) {
+        a.volume = 0
+        const p = a.play()
+        fade(a, targetVolume(key))
+        p.catch(() => armUnlock())
+      }
+      return
+    }
+    // ② 仍然失败：素材确实缺失，静默降级（不留空占位、不打扰玩家）
     missing.add(key)
     els.delete(key)
     if (current === key) current = null
-    console.info(`[audio] 未找到 ${SRC[key]}，该段落静音继续`)
+    console.info(`[audio] 未找到 ${SRC_FALLBACK[key]}，该段落静音继续`)
   })
   els.set(key, a)
   return a
