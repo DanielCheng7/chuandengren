@@ -392,11 +392,20 @@ try {
       badDialog[0] ? `｜样本 ${badDialog[0].nm}${badDialog[0].tx.slice(0, 20)}` : ''
     }`
   )
-  const ashunImg = seen.find((x) => x.nm.includes('阿鲟') && x.charImg)
+  // 2026-10-19：同屏上限 3 人后，阿鲟在 C3-2 这类 4 人场景会让位（只留名条），
+  // 所以不再要求"每句阿鲟台词都配立绘"，改判终点节点（C3-A，cast 含阿鲟）：
+  // **阿鲟在场就一定要有已加载的立绘**。
+  const ashunNow = await ev(`(() => {
+    const el = document.querySelector('.char-stage .char.is-ashun img');
+    return el ? { src: el.getAttribute('src'), w: el.naturalWidth } : null;
+  })()`)
+  const ashunLines = seen.filter((x) => x.nm.includes('阿鲟')).length
   check(
     '⑭ 阿鲟在场即有立绘 char-ashun.webp（已加载，与人物并排）',
-    !!ashunImg && ashunImg.charImg.src.includes('char-ashun') && ashunImg.charImg.w > 0,
-    ashunImg ? `${ashunImg.charImg.src} w=${ashunImg.charImg.w}` : '未捕获'
+    !!ashunNow && ashunNow.src.includes('char-ashun') && ashunNow.w > 0,
+    ashunNow
+      ? `${ashunNow.src} w=${ashunNow.w}｜本段阿鲟台词 ${ashunLines} 行`
+      : `未捕获（阿鲟台词 ${ashunLines} 行）`
   )
   check('⑮ 自检段无新增 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 

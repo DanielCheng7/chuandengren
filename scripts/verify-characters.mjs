@@ -11,8 +11,9 @@
  *   ③ 版式：单人 ≈88vh、**首次登场在左侧**、底边越过对白带顶（腿被裁）、水平不出画；
  *   ④ 换场景重建：夜市摊（只有阿鲟）→ 无人物立绘；
  *   ⑤ 双人分列不重叠（E1：九婆 + 阿禾）；
- *   ⑥ 三人分列不重叠（C3-2：九婆 + 阿禾 + 周经理）；
- *   ⑦ 无立绘角色（管理员）不留空框；阿鲟**并排站台**（无窗口、不与人物重叠）；
+ *   ⑥ 三人分列不重叠（C3-2：九婆 + 阿禾 + 周经理；阿鲟按同屏上限让位）；
+ *   ⑦ 无立绘角色（管理员）不留空框；阿鲟**并排站台**（无窗口、不与人物重叠）、
+ *     **主体贴在对白框上沿**（0–24px 缝）、**1280×720 与 1920×1080 下同样贴边**；
  *   ⑧ 移动端竖屏不出画、不压对白。
  */
 import { spawn } from 'node:child_process'
@@ -263,7 +264,7 @@ try {
   )
   await shot('03-duo-e1')
 
-  /* ===== E. 三人分列（C3-2：九婆 + 阿禾 + 周经理） ===== */
+  /* ===== E. 三人分列（C3-2：九婆 + 阿禾 + 周经理；阿鲟按同屏上限让位） ===== */
   await freshBoot()
   await jumpTo('C3-1')
   const trio = await advanceToNode(['C3-2'])
@@ -271,15 +272,17 @@ try {
   const trioNow = await probe()
   const xs = (trioNow?.rects ?? []).map((r) => r.x).sort((a, b) => a - b)
   const gaps = xs.slice(1).map((x, i) => x - xs[i])
-  const noOverlap3 = xs.length >= 3 && gaps.every((g) => g > 80)
+  const noOverlap3 = xs.length === 3 && gaps.every((g) => g > 80)
+  const trioSrcs = (trioNow?.rects ?? []).map((r) => r.src)
   check(
-    '⑥ 三人及以上均布不重叠（C3-2 围坐，含阿鲟）',
-    !!trio && trioNow?.count >= 3 && noOverlap3,
-    `${trioNow?.count} 人 @ x=${xs.join('/')}`
+    '⑥ 三人均布不重叠（C3-2 围坐：九婆＋阿禾＋周经理，阿鲟让位）',
+    !!trio && trioNow?.count === 3 && noOverlap3 && trioSrcs.some((s) => s.includes('zhou')) &&
+      !trioSrcs.some((s) => s.includes('ashun')),
+    `${trioNow?.count} 人 @ x=${xs.join('/')}｜${trioSrcs.map((s) => s.split('/').pop()).join(',')}`
   )
   await shot('04-trio-c3-2')
 
-  /* ===== E2. 同场景内离场：C3-8 三人 → C3-A 只剩九婆与阿禾 ===== */
+  /* ===== E2. 同场景内离场：C3-8 → C3-A，周经理退场、阿鲟在场 ===== */
   await freshBoot()
   await jumpTo('C3-1')
   await advanceToNode(['C3-8'], 120000)
@@ -288,10 +291,18 @@ try {
   await advanceToNode(['C3-A'], 60000)
   await sleep(400)
   const afterLeave = await probe()
+  const beforeNames = (beforeLeave?.rects ?? []).map((r) => r.src.split('/').pop())
+  const afterNames = (afterLeave?.rects ?? []).map((r) => r.src.split('/').pop())
   check(
-    '⑥-2 同场景内「人散了」：周经理退场（4 人 → 3 人）',
-    beforeLeave?.count === 4 && afterLeave?.count === 3 && afterLeave?.nodeId === 'C3-A',
-    `C3-8=${beforeLeave?.count} 人 → C3-A=${afterLeave?.count} 人`
+    '⑥-2 同场景内「人散了」：周经理退场、阿鲟接上（均不超过 3 人）',
+    beforeLeave?.count === 3 &&
+      afterLeave?.count === 3 &&
+      afterLeave?.nodeId === 'C3-A' &&
+      beforeNames.some((s) => s.includes('zhou')) &&
+      !beforeNames.some((s) => s.includes('ashun')) &&
+      afterNames.some((s) => s.includes('ashun')) &&
+      !afterNames.some((s) => s.includes('zhou')),
+    `C3-8=${beforeNames.join(',')} → C3-A=${afterNames.join(',')}`
   )
   await shot('05-leave-c3a')
 
@@ -350,17 +361,59 @@ try {
       const b = i.getBoundingClientRect();
       const el = i.parentElement;
       return { who: el.classList.contains('is-ashun') ? '阿鲟' : i.getAttribute('src').split('/').pop(),
-               x: Math.round(b.x), right: Math.round(b.right) };
+               x: Math.round(b.x), right: Math.round(b.right),
+               top: Math.round(b.top), bottom: Math.round(b.bottom) };
     });
     const overlap = list.length === 2 ? !(list[0].right <= list[1].x || list[1].right <= list[0].x) : null;
-    return { count: imgs.length, list, overlap };
+    const dbox = document.querySelector('.dbox');
+    const dt = dbox ? Math.round(dbox.getBoundingClientRect().top) : null;
+    const a = list.find((x) => x.who === '阿鲟');
+    return { count: imgs.length, list, overlap, dboxTop: dt, gap: a && dt !== null ? dt - a.bottom : null };
   })()`)
   check(
     '⑦-2 阿禾 + 阿鲟同屏：左右分列、不重叠（阿鲟无窗口）',
     both?.count === 2 && both.overlap === false && both.list.some((x) => x.who === '阿鲟'),
     `${both?.list?.map((x) => `${x.who}@${x.x}-${x.right}`).join('｜')}｜重叠=${both?.overlap}`
   )
+  check(
+    '⑦-3 阿鲟主体贴在对白框上沿（不压字：0 ≤ 缝 ≤ 24px）',
+    both?.gap !== null && both?.gap >= 0 && both?.gap <= 24,
+    `阿鲟底=${both?.list?.find((x) => x.who === '阿鲟')?.bottom} 对白顶=${both?.dboxTop} 缝=${both?.gap}px`
+  )
   await shot('06-ashun-and-ahe')
+
+  /* ===== F3. 分辨率稳定性：不同窗口尺寸下阿鲟仍贴住对白框上沿 =====
+     用户要求「不同分辨率与窗口尺寸下位置保持稳定」：分别切成 1280×720 与
+     1920×1080，量「阿鲟底 → 对白框顶」的缝隙，必须在 0–24px 之间且不重叠。 */
+  const gapsBySize = []
+  for (const [w, h] of [
+    [1280, 720],
+    [1920, 1080],
+  ]) {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width: w,
+      height: h,
+      deviceScaleFactor: 1,
+      mobile: false,
+    })
+    await sleep(600)
+    const g = await ev(`(() => {
+      const a = [...document.querySelectorAll('.char-stage .char.is-ashun img')][0];
+      const dbox = document.querySelector('.dbox');
+      if (!a || !dbox) return null;
+      const ab = a.getBoundingClientRect().bottom, dt = dbox.getBoundingClientRect().top;
+      return { gap: Math.round(dt - ab), vw: window.innerWidth, vh: window.innerHeight,
+               ashunTop: Math.round(a.getBoundingClientRect().top) };
+    })()`)
+    gapsBySize.push({ w, h, ...(g ?? {}) })
+  }
+  check(
+    '⑦-4 分辨率稳定：1280×720 与 1920×1080 下均贴边（0 ≤ 缝 ≤ 24px）',
+    gapsBySize.length === 2 && gapsBySize.every((g) => g.gap >= 0 && g.gap <= 24),
+    gapsBySize.map((g) => `${g.vw}×${g.vh} 缝=${g.gap}px`).join('｜')
+  )
+  await send('Emulation.clearDeviceMetricsOverride')
+  await sleep(400)
 
   /* ===== G. 移动端 ===== */
   await send('Emulation.setDeviceMetricsOverride', {

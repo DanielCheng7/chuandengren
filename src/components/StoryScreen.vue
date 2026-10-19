@@ -10,7 +10,7 @@
  *  §7   键盘：Space/Enter 推进、Esc 关面板；AI 文案 aria-live
  *  §5   顶栏只留作品名 + 审核 chip；操作集中在屏幕底部 1/3
  */
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import AiFish from './AiFish.vue'
 import CharacterLayer from './CharacterLayer.vue'
 import ChoiceButtons from './ChoiceButtons.vue'
@@ -314,13 +314,63 @@ onUnmounted(() => {
 
 // 阶段变化时重排缓冲计时（选项刚出现的那一刻开始计时）
 watch(phase, scheduleChoicesReady)
+
+/* ---------- 立绘贴边基准：对白带顶边 ----------
+   阿鲟要「贴在对白框上沿、不压字」，但对白带高度是会变的——字号设置、
+   选项带、自由输入面板、移动端安全区都会改变它。所以这里实测
+   「对白带顶边 → 画面底部」的距离，写成 CSS 变量 `--dbox-top`，
+   立绘层用 `bottom: calc(var(--dbox-top) + 6px)` 消费：
+   任何分辨率／窗口尺寸下都贴边，且永不上探盖住文字。 */
+const storyRef = ref<HTMLElement | null>(null)
+const bottomRef = ref<HTMLElement | null>(null)
+const dboxWrapRef = ref<HTMLElement | null>(null)
+const dboxTop = ref(192)
+let dboxRO: ResizeObserver | undefined
+
+function syncDboxTop() {
+  const root = storyRef.value
+  const box = dboxWrapRef.value
+  if (!root || !box) return
+  const r = root.getBoundingClientRect()
+  const b = box.getBoundingClientRect()
+  if (!r.height) return // 还没真正排版（隐藏/未挂载）时不要写入错值
+  dboxTop.value = Math.max(0, Math.round(r.bottom - b.top))
+}
+
+onMounted(async () => {
+  await nextTick()
+  syncDboxTop()
+  // 字体/画面进来会改变行高 → 首帧后再校两次；字体就绪后再校一次
+  requestAnimationFrame(() => {
+    syncDboxTop()
+    requestAnimationFrame(syncDboxTop)
+  })
+  document.fonts?.ready.then(syncDboxTop).catch(() => {})
+
+  if (typeof ResizeObserver !== 'undefined') {
+    dboxRO = new ResizeObserver(syncDboxTop)
+    // 对白带本身会变高（选项带／自由输入面板／AI 面板），底栏整体也要盯
+    if (dboxWrapRef.value) dboxRO.observe(dboxWrapRef.value)
+    if (bottomRef.value) dboxRO.observe(bottomRef.value)
+    if (storyRef.value) dboxRO.observe(storyRef.value)
+  }
+  window.addEventListener('resize', syncDboxTop)
+  window.addEventListener('orientationchange', syncDboxTop)
+})
+
+onUnmounted(() => {
+  dboxRO?.disconnect()
+  window.removeEventListener('resize', syncDboxTop)
+  window.removeEventListener('orientationchange', syncDboxTop)
+})
 </script>
 
 <template>
   <div
+    ref="storyRef"
     class="story"
     :class="{ 'ui-hidden': hudHidden, 'is-choosing': showChoices, 'overlay-open': showHistory }"
-    :style="{ '--tint': sceneTint }"
+    :style="{ '--tint': sceneTint, '--dbox-top': `${dboxTop}px` }"
   >
     <SceneBackdrop
       :scene="e.sceneKey.value"
@@ -382,8 +432,8 @@ watch(phase, scheduleChoicesReady)
       <!-- 道具亮相：整屏光雾 + 中央道具 + 文字（渐入 → 停留 → 渐隐 → 自动推进，UI 设计书 r4 §4.6） -->
       <ItemShowcase :line="currentItem" :text="itemText" :line-key="cardToken" />
 
-      <div class="bottom">
-        <div class="dbox-wrap">
+      <div ref="bottomRef" class="bottom">
+        <div ref="dboxWrapRef" class="dbox-wrap">
           <div class="dbox-blur">
             <!-- 自由输入阶段（2026-10-16 用户决议）：对白框隐去（保留占位），
                  只留问题/输入栏/预设选项——不再残留上一轮对话 -->

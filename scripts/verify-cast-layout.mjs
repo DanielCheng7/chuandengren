@@ -205,6 +205,15 @@ try {
   )
   check('④ 全程无 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 
+  // 2026-10-19 用户决议：一个场景最多 3 名角色，超出由 limitCast() 按优先级让位
+  const overCap = rows.filter((r) => r.count > 3)
+  check(
+    '⑤ 同屏角色不超过 3 人',
+    overCap.length === 0,
+    overCap.map((r) => `${r.nid}:${r.count}人`).join('｜') ||
+      `全 ${rows.length} 点最多 ${Math.max(0, ...rows.map((r) => r.count))} 人`
+  )
+
   writeFileSync(join(OUT, 'layout.json'), JSON.stringify(rows, null, 2))
 
   const failed = results.filter((r) => !r.ok)

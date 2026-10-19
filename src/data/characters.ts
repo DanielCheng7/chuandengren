@@ -25,7 +25,7 @@ export interface CharacterDef {
    * 知遥是"我"，只有名条与台词，画面里不出现自己。
    */
   noPortrait?: boolean
-  /** `ai`＝阿鲟（横卧鱼灯，走独立档位，不参与人物并排布局） */
+  /** `ai`＝阿鲟（横卧鱼灯，站位与人相同，仅尺寸档位不同） */
   kind?: 'human' | 'ai'
 }
 
@@ -50,4 +50,38 @@ export function getCharacter(speaker?: string): CharacterDef | undefined {
 export function canStandOnStage(speaker?: string): boolean {
   const c = getCharacter(speaker)
   return !!c && !!c.asset && !c.noPortrait
+}
+
+/**
+ * 同屏上限（2026-10-19 用户决议）：一个场景**最多同时 3 名角色**，
+ * 超出按主次优先级取舍；被裁掉的角色本场景不入场，等下一个场景再出现。
+ */
+export const CAST_MAX = 3
+
+/**
+ * 站台优先级：数字越小越优先保留（剧情主次，非出场先后）。
+ * 九婆（守）＞阿禾（新）＞周经理（现实压力）＞阿鲟（数据辅助，可只留名条）。
+ * 调整顺序＝调整"人多时谁让位"，只改这一张表。
+ */
+export const CAST_PRIORITY: Record<string, number> = {
+  九婆: 1,
+  阿禾: 2,
+  周经理: 3,
+  阿鲟: 4,
+}
+
+/**
+ * 把候选角色裁到同屏上限：先按优先级保留，**再恢复登场顺序**——
+ * 站位是「按 cast 顺序从左往右」，所以裁完必须还原原序，否则人物会莫名调位。
+ */
+export function limitCast(list: string[], max = CAST_MAX): string[] {
+  const uniq = [...new Set(list.filter((s) => canStandOnStage(s)))]
+  if (uniq.length <= max) return uniq
+  const rank = (s: string) => CAST_PRIORITY[s] ?? 99
+  return uniq
+    .map((s, i) => ({ s, i, r: rank(s) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i) // 优先级高者先占位；同级按登场先后
+    .slice(0, max)
+    .sort((a, b) => a.i - b.i) // 还原登场顺序 → 站位稳定
+    .map((x) => x.s)
 }

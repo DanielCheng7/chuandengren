@@ -3,12 +3,14 @@
  * 角色立绘层（V3.0，2026-10-19 重定站位规则）
  *
  * **在场角色**：由引擎 `cast` 决定，整场常驻——旁白行不消失，只在换场景或离场时切换。
- * **阿鲟也是角色**（2026-10-19 用户决议）：**不套窗口/黑框**，跟人物同一套站位规则；
- * 只因自身是 2:1 横卧鱼灯，用宽度约束 + 悬空高度，避免与竖立绘混排时撑满画面。
+ * **同屏上限 3 人**（2026-10-19 用户决议）：超出由 `limitCast()` 按 CAST_PRIORITY 让位，
+ * 被裁掉的角色本场景不入场，留到后续场景。
+ * **阿鲟也是角色**：**不套窗口/黑框**，跟人物同一套站位规则；
+ * 只因自身是 2:1 横卧鱼灯，用宽度约束；落点固定贴在对白带上沿（`--dbox-top`）。
  *
  * **站位规则（所有场景一致）**：
  *  ① **首次登场默认在左**——按 cast 顺序（= 登场顺序）从左往右排；
- *     1 人贴左 12%，2 人左右分列（左右各 12%），3／4 人均布；
+ *     1 人贴左 12%，2 人左右分列（左右各 12%），3 人均布；
  *  ② 多人互不重叠——由 flex 均分保证，不再逐人写死 left/right 导致撞车。
  *
  * **层级**：本层挂在 `.story` 下（不在可滚动的 `.stage` 里），z-index 低于舞台，
@@ -32,11 +34,11 @@ const srcOf = (who: string) => {
   return def?.asset ? `/assets/characters/${def.asset}` : ''
 }
 
-/** 场上角色：按 cast 顺序从左往右排，最多 4 位 */
+/** 场上角色：按 cast 顺序从左往右排，最多 3 位（引擎已按优先级裁过，这里兜底） */
 const standers = computed(() =>
   (props.cast ?? [])
     .filter((who) => canStandOnStage(who) && srcOf(who) && !broken.value.includes(who))
-    .slice(0, 4)
+    .slice(0, 3)
 )
 
 const total = computed(() => standers.value.length)
@@ -84,14 +86,10 @@ const isAshun = (who: string) => who === '阿鲟'
   padding: 0 12%;
 }
 
-/* 3／4 人：均布 */
+/* 3 人：均布 */
 .char-stage.n3 .row {
   justify-content: space-between;
   padding: 0 3%;
-}
-.char-stage.n4 .row {
-  justify-content: space-between;
-  padding: 0 2%;
 }
 
 /* ---------- 角色 ---------- */
@@ -123,34 +121,34 @@ const isAshun = (who: string) => who === '阿鲟'
 .char-stage.n3 .char {
   height: min(78vh, 900px);
 }
-.char-stage.n4 .char {
-  height: min(70vh, 820px);
-}
 
 /* ---------- 阿鲟：2:1 横卧鱼灯 ----------
-   它也是角色，**不套窗口/黑框**；只因横宽比例，改用宽度约束并悬空在人物腰际，
-   否则按立绘高度缩放会撑满半幅画面。 */
-.char.is-ashun {
+   它也是角色，**不套窗口/黑框**；只因横宽比例，改用宽度约束。
+   **落点固定贴在对白带上沿**（2026-10-19 用户要求：主体尽量贴近对话框顶边、
+   不重叠不遮挡）：`--dbox-top` 由 StoryScreen 实测「对白带顶边到画面底部的距离」，
+   随窗口尺寸／选项带／自由输入面板变化实时更新，再留 6px 呼吸缝。
+   不用 vh 硬编码 → 任何分辨率与窗口尺寸下都贴边且不压字。 */
+/* 选择器带 `.char-stage` 两个类：与 `.char-stage.n2 .char{height}` 同特异性，
+   且位置在后 → `height:auto` 生效（否则阿鲟会被撑到 84vh，图仍贴顶） */
+.char-stage .char.is-ashun {
   height: auto;
   width: min(30vw, 460px);
-  /* 往上抬一截：像一盏漂在半空的灯，而不是蹲在地上的物件 */
-  margin-bottom: 16vh;
+  margin-bottom: 0;
+  bottom: calc(var(--dbox-top, 192px) + 6px);
   filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.5))
     drop-shadow(0 0 30px rgba(255, 182, 92, 0.22));
 }
 
-.char.is-ashun img {
+.char-stage .char.is-ashun img {
   width: 100%;
   height: auto;
   filter: brightness(1.02) saturate(1.03);
   animation: ashun-float 7s ease-in-out infinite;
 }
 
-/* 人多时阿鲟收一档，避免挤到邻居 */
-.char-stage.n3 .char.is-ashun,
-.char-stage.n4 .char.is-ashun {
+/* 人多时阿鲟收一档，避免挤到邻居（高度随宽度等比缩，落点仍贴对白带） */
+.char-stage.n3 .char.is-ashun {
   width: min(24vw, 380px);
-  margin-bottom: 18vh;
 }
 
 @keyframes ashun-float {
@@ -180,21 +178,16 @@ const isAshun = (who: string) => who === '阿鲟'
   .char-stage.n3 .char {
     height: min(70vh, 640px);
   }
-  .char-stage.n4 .char {
-    height: min(64vh, 580px);
-  }
-  .char.is-ashun {
+  .char-stage .char.is-ashun {
     width: min(38vw, 300px);
-    margin-bottom: 14vh;
   }
-  .char-stage.n3 .char.is-ashun,
-  .char-stage.n4 .char.is-ashun {
+  .char-stage.n3 .char.is-ashun {
     width: min(30vw, 240px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .char.is-ashun img {
+  .char-stage .char.is-ashun img {
     animation: none;
   }
 }
