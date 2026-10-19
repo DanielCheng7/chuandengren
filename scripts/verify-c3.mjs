@@ -343,7 +343,7 @@ try {
     const cur = await ev(`(() => {
       const nm = document.querySelector('.dbox .name')?.textContent?.trim() || '';
       const tx = document.querySelector('.dbox .text')?.textContent?.trim() || '';
-      const img = document.querySelector('.ashun-window img'); // 只取阿鲟独立档位
+      const img = document.querySelector('.char-stage .char.is-ashun img'); // 阿鲟独立尺寸档（现已并排站台）
       const s = JSON.parse(localStorage.getItem('chuandengren.save.v4')||'{}');
       // 名字色 → rgb（CSS 变量是 hex）
       const hex2rgb = (h) => { const x = (h||'').trim().replace('#',''); const n = parseInt(x.length===3?x.split('').map(c=>c+c).join(''):x,16); return isNaN(n)?'':\`rgb(\${(n>>16)&255}, \${(n>>8)&255}, \${n&255})\` };
@@ -394,7 +394,7 @@ try {
   )
   const ashunImg = seen.find((x) => x.nm.includes('阿鲟') && x.charImg)
   check(
-    '⑭ 阿鲟对白时浮出立绘 char-ashun.webp（已加载）',
+    '⑭ 阿鲟在场即有立绘 char-ashun.webp（已加载，与人物并排）',
     !!ashunImg && ashunImg.charImg.src.includes('char-ashun') && ashunImg.charImg.w > 0,
     ashunImg ? `${ashunImg.charImg.src} w=${ashunImg.charImg.w}` : '未捕获'
   )

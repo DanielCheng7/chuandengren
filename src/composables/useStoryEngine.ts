@@ -338,9 +338,9 @@ export function useStoryEngine() {
     if (n.cast) {
       cast.value = n.cast.filter((s) => canStandOnStage(s))
     } else if (prevScene !== undefined && prevScene !== n.scene) {
-      cast.value = [...new Set(nodeSpeakers)].slice(0, 3)
+      cast.value = [...new Set(nodeSpeakers)].slice(0, 4)
     } else {
-      cast.value = [...new Set([...cast.value, ...nodeSpeakers])].slice(-3)
+      cast.value = [...new Set([...cast.value, ...nodeSpeakers])].slice(-4)
     }
     nodeId.value = id
     state.currentNodeId = id
@@ -748,7 +748,7 @@ export function useStoryEngine() {
         ? n.cast.filter((sp) => canStandOnStage(sp))
         : [
             ...new Set([...(prevSameScene ? speakersOf(prevSameScene) : []), ...speakersOf(n)]),
-          ].slice(-3)
+          ].slice(-4)
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       if (data.phase === 'ai') {
         // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用判定

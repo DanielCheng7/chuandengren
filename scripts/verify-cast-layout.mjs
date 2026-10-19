@@ -4,7 +4,7 @@
  *   ① 任意两个人不重叠；
  *   ② 单人在场时**在左侧**（首次登场默认在左）；
  *   ③ 人物不出画、腿被对白带裁；
- *   ④ 每个角色**第一次登场**时位于左侧。
+ *   ④ 每个场景**第一个登场的角色位于左侧**（其余按登场顺序往右排）。
  *
  * 用法：node scripts/verify-cast-layout.mjs [url] [outDir]
  *
@@ -112,9 +112,9 @@ try {
                  x: Math.round(r.x), right: Math.round(r.right), h: Math.round(r.height),
                  bottom: Math.round(r.bottom) };
       });
-      const w = document.querySelector('.ashun-window');
+      const w = document.querySelector('.char-stage .char.is-ashun');
       return { nodeId: s.nodeId, rects, vw: window.innerWidth, vh: window.innerHeight,
-               ashun: w ? Math.round(w.getBoundingClientRect().x) : null };
+               hasAshun: !!w };
     })()`)
 
   await send('Runtime.enable')
@@ -160,7 +160,7 @@ try {
     await ev(`[...document.querySelectorAll('.menu-item')].find(x => x.textContent.includes('继续上次'))?.click()`)
     await sleep(700)
     const m = await measure()
-    rows.push({ nid, count: m?.rects?.length ?? 0, rects: m?.rects ?? [], ashun: m?.ashun, vw: m?.vw, vh: m?.vh })
+    rows.push({ nid, count: m?.rects?.length ?? 0, rects: m?.rects ?? [], hasAshun: m?.hasAshun, vw: m?.vw, vh: m?.vh })
   }
 
   /* ---- 逐点判定 ---- */
@@ -174,11 +174,6 @@ try {
         const a = r.rects[i]
         const b = r.rects[j]
         if (!(a.right <= b.x || b.right <= a.x)) badOverlap.push(`${r.nid}: ${a.who} 与 ${b.who} 重叠`)
-      }
-      // 人物与阿鲟小窗
-      const a = r.rects[i]
-      if (r.ashun !== null && !(a.right <= r.ashun || r.ashun + 340 <= a.x)) {
-        // 阿鲟窗口宽按 min(20vw,340) 估，只做粗判（精确判定由 verify-characters ⑦-2 负责）
       }
     }
     // 单人在左
@@ -194,16 +189,19 @@ try {
   console.log('\n节点          人数  位置(x)                    阿鲟')
   for (const r of rows) {
     const pos = r.rects.map((x) => `${x.who}@${x.x}-${x.right}`).join(' ') || '—'
-    console.log(`${r.nid.padEnd(12)} ${String(r.count).padStart(2)}   ${pos.padEnd(26)} ${r.ashun ?? ''}`)
+    console.log(`${r.nid.padEnd(12)} ${String(r.count).padStart(2)}   ${pos.padEnd(26)} ${r.hasAshun ? '含阿鲟' : ''}`)
   }
 
   check('① 全部节点：任意两人不重叠', badOverlap.length === 0, badOverlap.slice(0, 4).join('｜') || `${rows.length} 点已检`)
   check('② 单人在场时在左侧', badLeft.length === 0, badLeft.slice(0, 4).join('｜') || '无越界')
-  const firstRight = [...firstSeen.entries()].filter(([, v]) => v.x >= v.vw * 0.5)
+  // "首次登场默认在左"的落地口径：**每个场景里第一个登场的角色必须在左**，
+  // 其余按登场顺序往右排（两个角色时即左右分列）。单人场景自然也在左。
+  const badFirstSlot = rows.filter((r) => r.rects.length > 0 && r.rects[0].x >= r.vw * 0.5)
   check(
-    '③ 每个角色首次登场都在左侧',
-    firstRight.length === 0,
-    [...firstSeen.entries()].map(([k, v]) => `${k}@${v.nid}(x=${v.x})`).join('｜') || '无'
+    '③ 每个场景的首位角色都在左侧',
+    badFirstSlot.length === 0,
+    badFirstSlot.slice(0, 4).map((r) => `${r.nid}: ${r.rects[0].who}@${r.rects[0].x}`).join('｜') ||
+      `各场景首位均在左：${[...firstSeen.entries()].map(([k, v]) => `${k}@${v.nid}`).join('｜')}`
   )
   check('④ 全程无 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 

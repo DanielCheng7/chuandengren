@@ -12,7 +12,7 @@
  *   ④ 换场景重建：夜市摊（只有阿鲟）→ 无人物立绘；
  *   ⑤ 双人分列不重叠（E1：九婆 + 阿禾）；
  *   ⑥ 三人分列不重叠（C3-2：九婆 + 阿禾 + 周经理）；
- *   ⑦ 无立绘角色（管理员）不留空框；阿鲟走右上角小窗、**不压人物**；
+ *   ⑦ 无立绘角色（管理员）不留空框；阿鲟**并排站台**（无窗口、不与人物重叠）；
  *   ⑧ 移动端竖屏不出画、不压对白。
  */
 import { spawn } from 'node:child_process'
@@ -240,10 +240,11 @@ try {
   const night = await advanceToNode(['C1-4c'])
   await sleep(400)
   const nightNow = await probe()
+  const nightWho = await ev(`[...document.querySelectorAll('.char-stage .char')].map((el) => el.classList.contains('is-ashun') ? '阿鲟' : '人物')`)
   check(
-    '④ 换场景重建：夜市摊（只阿鲟说话）无人物立绘',
-    !!night && nightNow?.count === 0,
-    `node=${nightNow?.nodeId} 人物立绘=${nightNow?.count}`
+    '④ 换场景重建：夜市摊只有阿鲟（无人物立绘）',
+    !!night && nightNow?.count === 1 && nightWho?.[0] === '阿鲟',
+    `node=${nightNow?.nodeId} 场上=${JSON.stringify(nightWho)}`
   )
   await shot('02-night-stall')
 
@@ -269,10 +270,11 @@ try {
   await sleep(500)
   const trioNow = await probe()
   const xs = (trioNow?.rects ?? []).map((r) => r.x).sort((a, b) => a - b)
-  const noOverlap3 = xs.length === 3 && xs[1] - xs[0] > 100 && xs[2] - xs[1] > 100
+  const gaps = xs.slice(1).map((x, i) => x - xs[i])
+  const noOverlap3 = xs.length >= 3 && gaps.every((g) => g > 80)
   check(
-    '⑥ 三人分列不重叠（C3-2 围坐）',
-    !!trio && trioNow?.count === 3 && noOverlap3,
+    '⑥ 三人及以上均布不重叠（C3-2 围坐，含阿鲟）',
+    !!trio && trioNow?.count >= 3 && noOverlap3,
     `${trioNow?.count} 人 @ x=${xs.join('/')}`
   )
   await shot('04-trio-c3-2')
@@ -287,8 +289,8 @@ try {
   await sleep(400)
   const afterLeave = await probe()
   check(
-    '⑥-2 同场景内「人散了」：周经理退场（3 人 → 2 人）',
-    beforeLeave?.count === 3 && afterLeave?.count === 2 && afterLeave?.nodeId === 'C3-A',
+    '⑥-2 同场景内「人散了」：周经理退场（4 人 → 3 人）',
+    beforeLeave?.count === 4 && afterLeave?.count === 3 && afterLeave?.nodeId === 'C3-A',
     `C3-8=${beforeLeave?.count} 人 → C3-A=${afterLeave?.count} 人`
   )
   await shot('05-leave-c3a')
@@ -302,29 +304,30 @@ try {
   await advanceToNode(['C1-4a'])
   await sleep(400)
   const adminNow = await probe()
+  const adminWho = await ev(`[...document.querySelectorAll('.char-stage .char')].map((el) => el.classList.contains('is-ashun') ? '阿鲟' : '人物')`)
   check(
-    '⑦ 无立绘角色（管理员）不留空框',
-    adminNow?.name.includes('管理员') && adminNow?.count === 0,
-    `name=${adminNow?.name} 立绘=${adminNow?.count}`
+    '⑦ 无立绘角色（管理员）不留空框——场上只有阿鲟',
+    adminNow?.name.includes('管理员') && (adminWho ?? []).every((w) => w === '阿鲟'),
+    `name=${adminNow?.name} 场上=${JSON.stringify(adminWho)}`
   )
   await shot('05-no-portrait')
 
   await freshBoot()
   await jumpTo('C1-1')
-  // 走到 C1-4a（管理员那处）后继续点，直到阿鲟开口——它只在说话时浮出
+  // 走到 C1-4a（管理员那处）后继续点，直到阿鲟在场——它整场常驻，与人物并排
   await advanceToNode(['C1-4a'], 120000)
   for (let i = 0; i < 12; i++) {
-    const has = await ev(`!!document.querySelector('.ashun-window img')`)
+    const has = await ev(`!!document.querySelector('.char-stage .char.is-ashun img')`)
     if (has) break
     await tap()
     await sleep(200)
   }
   const ashunProbe = await ev(`(() => {
-    const el = document.querySelector('.ashun-window img');
+    const el = document.querySelector('.char-stage .char.is-ashun img');
     return el ? { w: el.naturalWidth, h: el.naturalHeight, src: el.getAttribute('src') } : null;
   })()`)
   check(
-    '⑧ 阿鲟走独立档位（横卧鱼灯，不占人物位）',
+    '⑧ 阿鲟尺寸档（横卧鱼灯、宽度约束，与人物并排）',
     !!ashunProbe && ashunProbe.src.includes('char-ashun') && ashunProbe.w > 0,
     ashunProbe ? `${ashunProbe.src} ${ashunProbe.w}x${ashunProbe.h}` : '未出现'
   )
@@ -337,24 +340,25 @@ try {
   await ev(`[...document.querySelectorAll('.btn.choice:not([disabled])')].find(b=>b.textContent.includes('文创店'))?.click()`)
   await advanceToNode(['C1-4b'], 60000)
   for (let i = 0; i < 12; i++) {
-    if (await ev(`!!document.querySelector('.ashun-window img')`)) break
+    if (await ev(`!!document.querySelector('.char-stage .char.is-ashun img')`)) break
     await tap()
     await sleep(200)
   }
   const both = await ev(`(() => {
-    const c = document.querySelector('.char-stage .char img');
-    const w = document.querySelector('.ashun-window');
-    const rc = c?.getBoundingClientRect(), rw = w?.getBoundingClientRect();
-    return {
-      char: rc ? { x: Math.round(rc.x), right: Math.round(rc.right), y: Math.round(rc.y) } : null,
-      ashun: rw ? { x: Math.round(rw.x), right: Math.round(rw.right), y: Math.round(rw.y), w: Math.round(rw.width) } : null,
-      overlap: rc && rw ? !(rc.right <= rw.x || rw.right <= rc.x) : null,
-    };
+    const imgs = [...document.querySelectorAll('.char-stage .char img')];
+    const list = imgs.map((i) => {
+      const b = i.getBoundingClientRect();
+      const el = i.parentElement;
+      return { who: el.classList.contains('is-ashun') ? '阿鲟' : i.getAttribute('src').split('/').pop(),
+               x: Math.round(b.x), right: Math.round(b.right) };
+    });
+    const overlap = list.length === 2 ? !(list[0].right <= list[1].x || list[1].right <= list[0].x) : null;
+    return { count: imgs.length, list, overlap };
   })()`)
   check(
-    '⑦-2 阿禾 + 阿鲟同屏不重叠（阿鲟右上角小窗）',
-    !!both?.char && !!both?.ashun && both.overlap === false,
-    `人物 ${both?.char?.x}-${both?.char?.right}｜阿鲟 ${both?.ashun?.x}-${both?.ashun?.right}｜重叠=${both?.overlap}`
+    '⑦-2 阿禾 + 阿鲟同屏：左右分列、不重叠（阿鲟无窗口）',
+    both?.count === 2 && both.overlap === false && both.list.some((x) => x.who === '阿鲟'),
+    `${both?.list?.map((x) => `${x.who}@${x.x}-${x.right}`).join('｜')}｜重叠=${both?.overlap}`
   )
   await shot('06-ashun-and-ahe')
 

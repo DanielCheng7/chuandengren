@@ -130,13 +130,6 @@ const schemeScene = computed<SceneKey>(
 /** 场景谐调色：写入 --tint，供对话带 / 选项带消费；按幕统一（幕内不随场景跳色） */
 const sceneTint = computed(() => getSceneTint(schemeScene.value))
 
-/** 立绘层只在角色对白时出现；素材未到位时该层自动不渲染 */
-const speakerForLayer = computed(() => {
-  const l = displayLine.value
-  if (!l || l.type !== 'dialogue') return undefined
-  return l.speaker
-})
-
 /* ---------- 选项出现后的 300ms 防连点缓冲（UI 设计书 §4.3） ---------- */
 const choicesReady = ref(false)
 let readyTimer: number | undefined
@@ -340,7 +333,7 @@ watch(phase, scheduleChoicesReady)
          挂在 stage 之外、z-index 低于舞台：对白带自然盖住人物下半身，
          也不会给可滚动的 .stage 添滚动条。在场人物由引擎 cast 决定，
          旁白行不改变 cast，所以旁白时立绘不消失。 -->
-    <CharacterLayer :cast="e.cast.value" :speaker="speakerForLayer" />
+    <CharacterLayer :cast="e.cast.value" />
 
     <!-- 幕间角标水印：仅幕（章）切换时浮出（2.4s 起落，UI 设计书 r4 §6）；
          普通场景切换不再浮出（2026-10-17 用户决议） -->

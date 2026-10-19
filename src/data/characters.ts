@@ -42,8 +42,12 @@ export function getCharacter(speaker?: string): CharacterDef | undefined {
   return CHARACTERS[speaker]
 }
 
-/** 能否作为"在场人物"站在画面里（有立绘、非主角、非阿鲟） */
+/**
+ * 能否作为「在场角色」站在画面里：有立绘、且不是第一人称主角。
+ * **阿鲟也算角色**（2026-10-19 用户决议）——它跟人物同一套站位规则，
+ * 只是自身是 2:1 横卧鱼灯，尺寸与落点单独处理（见 CharacterLayer）。
+ */
 export function canStandOnStage(speaker?: string): boolean {
   const c = getCharacter(speaker)
-  return !!c && !!c.asset && !c.noPortrait && c.kind === 'human'
+  return !!c && !!c.asset && !c.noPortrait
 }
