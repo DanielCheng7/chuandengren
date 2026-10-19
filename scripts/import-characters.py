@@ -21,6 +21,7 @@
   E:/Python/python.exe scripts/import-characters.py
 """
 import os
+import sys
 from PIL import Image
 
 # ---------------- 配置（改这里即可换图/改规格） ----------------
@@ -38,6 +39,15 @@ CHARS = [
 ]
 # （源文件后缀, 输出文件后缀）
 SIDES = [('左站位', 'left'), ('右站位', 'right')]
+
+# 只处理指定角色：`python scripts/import-characters.py 阿禾 [九婆 ...]`
+# 不传则处理全部（换单角色素材时建议只跑该角色，避免其余角色的 WebP 被重新编码）
+_ONLY = [a for a in sys.argv[1:] if not a.startswith('--')]
+if _ONLY:
+    CHARS = [c for c in CHARS if c[0] in _ONLY]
+    if not CHARS:
+        print(f'未匹配到角色：{_ONLY}（可选：九婆 / 阿禾 / 知遥 / 周经理 / 阿鲟）')
+        raise SystemExit(1)
 
 TARGET_CHAR_H = 1400   # 人物像素高度（CharacterLayer 最大 88vh，2x 屏够用）
 TARGET_LAMP_W = 1100   # 阿鲟鱼灯像素宽度（2:1 横图，按宽定尺）
