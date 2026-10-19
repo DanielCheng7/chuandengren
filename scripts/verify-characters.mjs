@@ -8,11 +8,11 @@
  * 验证点（2026-10-19 用户要求：立绘整场常驻，不在旁白时消失）：
  *   ① 进场景即有立绘（不等第一句台词）；
  *   ② **旁白行立绘不消失**：C1-2 逐行采样，场上有名字的 11 行里立绘数量恒为 1；
- *   ③ 版式对齐参考图：单人 ≈92vh、靠右、底边越过对白带顶（腿部被裁）且不出画；
+ *   ③ 版式：单人 ≈88vh、**首次登场在左侧**、底边越过对白带顶（腿被裁）、水平不出画；
  *   ④ 换场景重建：夜市摊（只有阿鲟）→ 无人物立绘；
  *   ⑤ 双人分列不重叠（E1：九婆 + 阿禾）；
  *   ⑥ 三人分列不重叠（C3-2：九婆 + 阿禾 + 周经理）；
- *   ⑦ 无立绘角色（管理员）不留空框；阿鲟走独立档位；
+ *   ⑦ 无立绘角色（管理员）不留空框；阿鲟走右上角小窗、**不压人物**；
  *   ⑧ 移动端竖屏不出画、不压对白。
  */
 import { spawn } from 'node:child_process'
@@ -220,11 +220,11 @@ try {
   /* ===== B. 版式：单人 92vh、靠右、腿部被对白带裁 ===== */
   const solo = c12?.rects[0]
   check(
-    '③ 版式对齐参考图：≈88vh、靠右、水平不出画、底边越过对白带（腿被裁）',
+    '③ 版式：单人 ≈88vh、**首次登场在左侧**、水平不出画、底边越过对白带（腿被裁）',
     !!solo &&
       solo.h >= (c12.vh * 0.84) &&
       solo.h <= c12.vh * 0.96 &&
-      solo.x > c12.vw * 0.5 &&
+      solo.x < c12.vw * 0.5 &&
       solo.x >= 0 &&
       solo.right <= c12.vw + 1 &&
       solo.bottom > (c12.dboxTop ?? 0),
@@ -314,13 +314,13 @@ try {
   // 走到 C1-4a（管理员那处）后继续点，直到阿鲟开口——它只在说话时浮出
   await advanceToNode(['C1-4a'], 120000)
   for (let i = 0; i < 12; i++) {
-    const has = await ev(`!!document.querySelector('.char-stage .char.is-ashun img')`)
+    const has = await ev(`!!document.querySelector('.ashun-window img')`)
     if (has) break
     await tap()
     await sleep(200)
   }
   const ashunProbe = await ev(`(() => {
-    const el = document.querySelector('.char-stage .char.is-ashun img');
+    const el = document.querySelector('.ashun-window img');
     return el ? { w: el.naturalWidth, h: el.naturalHeight, src: el.getAttribute('src') } : null;
   })()`)
   check(
@@ -328,6 +328,35 @@ try {
     !!ashunProbe && ashunProbe.src.includes('char-ashun') && ashunProbe.w > 0,
     ashunProbe ? `${ashunProbe.src} ${ashunProbe.w}x${ashunProbe.h}` : '未出现'
   )
+
+  /* ===== F2. 阿鲟与人物同屏不重叠（用户点名的第一幕：阿禾 + 阿鲟） ===== */
+  await freshBoot()
+  await jumpTo('C1-1')
+  await advanceToNode(['C1-3'])
+  await sleep(500)
+  await ev(`[...document.querySelectorAll('.btn.choice:not([disabled])')].find(b=>b.textContent.includes('文创店'))?.click()`)
+  await advanceToNode(['C1-4b'], 60000)
+  for (let i = 0; i < 12; i++) {
+    if (await ev(`!!document.querySelector('.ashun-window img')`)) break
+    await tap()
+    await sleep(200)
+  }
+  const both = await ev(`(() => {
+    const c = document.querySelector('.char-stage .char img');
+    const w = document.querySelector('.ashun-window');
+    const rc = c?.getBoundingClientRect(), rw = w?.getBoundingClientRect();
+    return {
+      char: rc ? { x: Math.round(rc.x), right: Math.round(rc.right), y: Math.round(rc.y) } : null,
+      ashun: rw ? { x: Math.round(rw.x), right: Math.round(rw.right), y: Math.round(rw.y), w: Math.round(rw.width) } : null,
+      overlap: rc && rw ? !(rc.right <= rw.x || rw.right <= rc.x) : null,
+    };
+  })()`)
+  check(
+    '⑦-2 阿禾 + 阿鲟同屏不重叠（阿鲟右上角小窗）',
+    !!both?.char && !!both?.ashun && both.overlap === false,
+    `人物 ${both?.char?.x}-${both?.char?.right}｜阿鲟 ${both?.ashun?.x}-${both?.ashun?.right}｜重叠=${both?.overlap}`
+  )
+  await shot('06-ashun-and-ahe')
 
   /* ===== G. 移动端 ===== */
   await send('Emulation.setDeviceMetricsOverride', {

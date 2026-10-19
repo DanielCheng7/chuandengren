@@ -5,8 +5,12 @@
  * **常驻在场**：立绘不再跟着"这一行是谁在说"闪进闪出，而是由引擎的 `cast`（在场人物）
  * 决定——整场戏里持续显示，只在换场景或人物离场时切换／消失。旁白行不影响立绘。
  *
- * **版式（对齐参考图）**：人物放大到接近满幅（1 人 92vh、2 人 88vh、3 人 78vh），
- * 底边下探 4vh，让腿部被对白带裁掉；1 人靠右中、2 人左右分列、3 人左中右均分。
+ * **版式（对齐参考图）**：人物放大到接近满幅（1 人 88vh、2 人 84vh、3 人 78vh），
+ * 底边下探 4vh，让腿部被对白带裁掉。
+ * **站位规则（2026-10-19 用户决议）**：
+ *  ① **首次登场默认在左侧**——单人也站左，不再靠右；
+ *  ② 同场两人**左右分列、互不重叠**（左 12% / 右 14%）；
+ *  ③ 阿鲟出场时占**右上角小窗**，人物右列让到 26% 给它腾位（`.has-ashun`），保证两者不叠。
  *
  * **层级**：本层挂在 `.story` 下（不在可滚动的 `.stage` 里），z-index 低于舞台，
  * 因此对白带会自然盖住人物下半身，且不会给舞台添滚动条。
@@ -46,7 +50,7 @@ const total = computed(() => standers.value.length)
 </script>
 
 <template>
-  <div v-if="total > 0 || ashunOn" class="char-stage">
+  <div v-if="total > 0 || ashunOn" class="char-stage" :class="{ 'has-ashun': ashunOn }">
     <!-- 人物：1 人靠右中；2 人左右分列；3 人左中右 -->
     <div
       v-for="(who, i) in standers"
@@ -61,8 +65,8 @@ const total = computed(() => standers.value.length)
       />
     </div>
 
-    <!-- 阿鲟：横卧鱼灯，右侧偏上悬空 -->
-    <div v-if="ashunOn" class="char is-ashun">
+    <!-- 阿鲟：手机小窗形态，固定右上角（不参与人物并排、不压人物） -->
+    <div v-if="ashunOn" class="ashun-window">
       <img
         :src="srcOf('阿鲟')"
         alt="阿鲟"
@@ -101,21 +105,21 @@ const total = computed(() => standers.value.length)
   filter: brightness(0.94) saturate(0.96);
 }
 
-/* 1 人：靠右中（与参考图单人位一致，右侧留呼吸；不贴边） */
+/* 1 人：**首次登场默认在左**（2026-10-19 用户决议，不再靠右） */
 .char.n1 {
   height: min(88vh, 1060px);
-  right: 20%;
+  left: 12%;
 }
 
-/* 2 人：左右分列，中间留出对话带 */
+/* 2 人：左右分列，互不重叠（左 12% / 右 14%） */
 .char.n2 {
   height: min(84vh, 1000px);
 }
 .char.n2.i0 {
-  left: 16%;
+  left: 12%;
 }
 .char.n2.i1 {
-  right: 16%;
+  right: 14%;
 }
 
 /* 3 人：左中右均分，缩小一档避免重叠 */
@@ -123,33 +127,50 @@ const total = computed(() => standers.value.length)
   height: min(78vh, 900px);
 }
 .char.n3.i0 {
-  left: 4%;
+  left: 3%;
 }
 .char.n3.i1 {
   left: 50%;
   transform: translateX(-50%);
 }
 .char.n3.i2 {
-  right: 4%;
+  right: 3%;
 }
 
-/* ---------- 阿鲟：横卧鱼灯（约 2:1）----------
-   悬在画面右侧偏上，给底部对白带让位；轻微上下浮动像"漂"着。
-   浮动写在 img 上，避免覆盖外层过渡。 */
-.char.is-ashun {
-  right: 5%;
-  bottom: 22%;
-  height: auto;
-  width: min(46vw, 520px);
-  filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.45))
-    drop-shadow(0 0 32px rgba(255, 182, 92, 0.3));
+/* 阿鲟在右上角小窗时：人物右列让到 26%，把右上角空出来（两者不叠） */
+.char-stage.has-ashun .char.n2.i1 {
+  right: 26%;
+}
+.char-stage.has-ashun .char.n3.i2 {
+  right: 26%;
 }
 
-.char.is-ashun img {
+/* ---------- 阿鲟：右上角「手机小窗」----------
+   剧本里阿鲟是"立在桌上的手机小窗"，这里做成悬浮玻璃窗：
+   固定右上角、不参与人物并排，也不压在水印上（top 8% 让开角标）。
+   轻微浮动像"漂"着。 */
+.ashun-window {
+  position: absolute;
+  top: 8%;
+  right: 2%;
+  width: min(20vw, 340px);
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(16, 24, 40, 0.42);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(232, 163, 61, 0.32);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.45),
+    0 0 32px rgba(255, 182, 92, 0.18);
+  animation: ashun-float 7s ease-in-out infinite;
+}
+
+.ashun-window img {
+  display: block;
   width: 100%;
   height: auto;
   filter: brightness(1.02) saturate(1.03);
-  animation: ashun-float 7s ease-in-out infinite;
 }
 
 @keyframes ashun-float {
@@ -180,15 +201,17 @@ const total = computed(() => standers.value.length)
   .char.n3 {
     height: min(70vh, 640px);
   }
-  .char.is-ashun {
+  .ashun-window {
+    top: 7%;
     right: 2%;
-    bottom: 24%;
-    width: min(80vw, 420px);
+    width: min(46vw, 220px);
+    padding: 8px 9px;
+    border-radius: 12px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .char.is-ashun img {
+  .ashun-window {
     animation: none;
   }
 }

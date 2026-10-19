@@ -733,16 +733,22 @@ export function useStoryEngine() {
       // 旧存档没有 missingNodeId：从当前节点的下一步反推，断点屏才不会显示空节点号
       if (data.phase === 'break' && !missingNodeId.value) missingNodeId.value = n.nextNodeId ?? null
       lines.value = resolveNodeLines(n)
-      // 在场人物同样要重建，否则刷新后立绘会空一屏
+      // 在场人物同样要重建，否则刷新后立绘会空一屏。
+      // 只按本节点重建的话，同场景换节点后刷新会"少人"（比如 C3-3 只剩九婆），
+      // 所以再并上**同场景最近访问过**的那个节点的说话人，接近连续游玩时的状态。
+      const speakersOf = (nd: StoryNode) =>
+        nd.lines
+          .filter((l) => (l.type === 'dialogue' || l.type === 'sms') && canStandOnStage(l.speaker))
+          .map((l) => l.speaker as string)
+      const prevSameScene = [...state.visitedNodes]
+        .reverse()
+        .map((id) => getNode(id))
+        .find((x) => x && x.id !== n.id && x.scene === n.scene)
       cast.value = n.cast
         ? n.cast.filter((sp) => canStandOnStage(sp))
         : [
-            ...new Set(
-              n.lines
-                .filter((l) => (l.type === 'dialogue' || l.type === 'sms') && canStandOnStage(l.speaker))
-                .map((l) => l.speaker as string)
-            ),
-          ].slice(0, 3)
+            ...new Set([...(prevSameScene ? speakersOf(prevSameScene) : []), ...speakersOf(n)]),
+          ].slice(-3)
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       if (data.phase === 'ai') {
         // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用判定
