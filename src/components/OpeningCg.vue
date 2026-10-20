@@ -30,10 +30,12 @@ interface Caption {
   from: number
   to: number
   text: string
-  /** normal：常规；step：四道工单字；credit：落版；note：角落小字 */
-  kind?: 'normal' | 'step' | 'credit1' | 'credit2' | 'note'
+  /** normal：常规；steps：四道工工序条；credit：落版；note：角落小字 */
+  kind?: 'normal' | 'steps' | 'credit1' | 'credit2' | 'note'
   /** 淡入淡出时长（ms）。短镜头用快切，避免"清晰时间"被淡变吃掉 */
   fade?: number
+  /** 工序条：整行常驻，按 at 依次点亮当前工序 */
+  steps?: { at: number; text: string }[]
 }
 
 const CAPTIONS: Caption[] = [
@@ -42,14 +44,23 @@ const CAPTIONS: Caption[] = [
   { from: 2.8, to: 5.4, text: '旱坡地上，水向天借。' },
   { from: 5.9, to: 8.9, text: '三百年前，鱼扎进了灯里。' },
   /**
-   * S4a–S4d：四连硬切，**逐镜单字且首尾无缝相接**。
-   * 每条窗口＝所属镜头全长（略让出切点前后的画面），配合 100ms 快淡变，
-   * 保证每个工序词有 ≈1 秒完整可读时间（旧版 300ms 淡变只剩 200ms，来不及看）。
+   * S4a–S4d「四道工」：整行**常驻 4.75 秒**，只有当前工序逐镜点亮。
+   * 之前逐镜整条替换，每条只剩 1 秒可读、切换时闪断；改成工序条后
+   * 观众随时能看到完整四步，同时当前动作仍然一镜一对应（2026-10-20 用户要求"再放慢"）。
    */
-  { from: 9.1, to: 10.1, text: '选竹', kind: 'step', fade: 100 },
-  { from: 10.1, to: 11.3, text: '扎骨', kind: 'step', fade: 100 },
-  { from: 11.3, to: 12.5, text: '糊纸', kind: 'step', fade: 100 },
-  { from: 12.5, to: 13.85, text: '绘鳞', kind: 'step', fade: 100 },
+  {
+    from: 9.1,
+    to: 13.85,
+    text: '',
+    kind: 'steps',
+    fade: 200,
+    steps: [
+      { at: 9.1, text: '选竹' },
+      { at: 10.1, text: '扎骨' },
+      { at: 11.3, text: '糊纸' },
+      { at: 12.5, text: '绘鳞' },
+    ],
+  },
   // S5 点亮：无字幕，让画面说话
   // S6：俯拍推镜建立后再出字（+0.5），给"灯河成形"一点时间
   { from: 17.8, to: 22.9, text: '正月十四、十五，百鱼成河。' },
@@ -70,6 +81,17 @@ const now = ref(0)
 const activeCaptions = computed(() =>
   SHOW_CAPTIONS ? CAPTIONS.filter((c) => now.value >= c.from && now.value < c.to) : []
 )
+
+/** 当前点亮的工序序号（-1 = 未进入） */
+const stepIndex = computed(() => {
+  const c = CAPTIONS.find((x) => x.kind === 'steps')
+  if (!c?.steps || now.value < c.from || now.value >= c.to) return -1
+  let idx = -1
+  c.steps.forEach((s, i) => {
+    if (now.value >= s.at) idx = i
+  })
+  return idx
+})
 
 let raf = 0
 /** 用 rAF 读播放进度（timeupdate 只有 ~4Hz，1 秒的工序镜头会滞后） */
@@ -132,12 +154,18 @@ onUnmounted(() => {
     <TransitionGroup name="cap">
       <p
         v-for="c in activeCaptions"
-        :key="c.text"
+        :key="c.text || c.kind"
         class="cg-caption"
         :class="`kind-${c.kind ?? 'normal'}`"
         :style="{ '--cap-fade': `${c.fade ?? 300}ms` }"
       >
-        {{ c.text }}
+        <template v-if="c.steps">
+          <template v-for="(s, i) in c.steps" :key="s.text">
+            <span class="step" :class="{ 'is-on': i === stepIndex }">{{ s.text }}</span>
+            <span v-if="i < c.steps.length - 1" class="sep" aria-hidden="true">·</span>
+          </template>
+        </template>
+        <template v-else>{{ c.text }}</template>
       </p>
     </TransitionGroup>
 
@@ -212,14 +240,30 @@ onUnmounted(() => {
 }
 
 .kind-normal,
-.kind-step {
+.kind-steps {
   bottom: 12%;
 }
 
-/* 四道工：单字更疏、略大，1 秒内也读得清 */
-.kind-step {
+/* 四道工工序条：整行常驻 4.75s，当前步骤点亮（其余半透明） */
+.kind-steps {
   font-size: calc(24px * var(--font-scale));
-  letter-spacing: 0.3em;
+  letter-spacing: 0.22em;
+  white-space: nowrap;
+}
+
+.step {
+  opacity: 0.35;
+  transition: opacity 140ms ease, text-shadow 140ms ease;
+}
+
+.step.is-on {
+  opacity: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 16px rgba(232, 163, 61, 0.5);
+}
+
+.sep {
+  margin: 0 0.45em;
+  opacity: 0.22;
 }
 
 /* 落版：居中两行，依次淡入 */
@@ -251,8 +295,9 @@ onUnmounted(() => {
     font-size: calc(18px * var(--font-scale));
   }
 
-  .kind-step {
+  .kind-steps {
     font-size: calc(20px * var(--font-scale));
+    letter-spacing: 0.16em;
   }
 
   .kind-credit1 {
