@@ -7,10 +7,13 @@
  *  - 画面／声音／舞台提示 → `stage`（仅审核模式显示，供创作团队核对）；演示模式（默认）不显示。
  *
  * 演出切分（不改一字，仅拆行播放）：
- *   ① 【C1-2】剧本「画面」含老街 → 灯坊的叠化，属转场镜头；原型阶段场景以灯坊（lantern_workshop）
- *      承接，老街的叠化在素材阶段以实拍转场实现（scene key 已备 `laoxu_street`），审核层保留完整画面说明；
+ *   ① 【C1-2】剧本「画面」含老街 → 灯坊的叠化，属转场镜头；2026-10-21 接入实拍背景图后
+ *      **拆为 C1-2（laoxu_street 老街）＋ C1-2b（lantern_workshop 灯坊内部）**——单节点只能挂
+ *      一张背景图，跨两个空间的节点会串景；拆分后台词逐字不变、仅切分播放。
  *   ② 【C1-4b】阿禾台词「这个纹样……都没问过。」在剧本中为同一段落（段内换行），
  *      工程拆为两行顺序播放（打字机节奏）。
+ *   ③ 【C1-5】单屏图 `ch1/C1-5_workshop_door.webp` 内已画出九婆与知遥（CG 级），
+ *      故本节点 `cast: []` 清空立绘，避免与图中人物重影。
  *
  * 机制（《开发文档》§6.3）：
  *   - 选择①（C1-3）：三错位「三个必看全」——带 `setFlags.c1Spot` 的选项按 c1Order 去重，
@@ -46,24 +49,39 @@ export const c1Nodes: StoryNode[] = [
     nextNodeId: 'C1-2',
   },
 
-  /* ============ C1-2｜老街与灯坊 ============ */
+  /* ============ C1-2｜老街（阿禾关店门） ============ */
   {
     id: 'C1-2',
     chapter: CHAPTER,
     sectionTitle: 'C1-2｜老街与灯坊',
-    scene: 'lantern_workshop',
+    // 这一段在「老街」，灯坊内部另立 C1-2b（2026-10-21 接入实拍背景后拆分）
+    scene: 'laoxu_street',
     lines: [
       stage('【C1-2】老街与灯坊'),
-      stage(
-        '画面：laoxu_street 黄昏空街。阿禾正在拉下工作室的卷帘门，看见他，停住 → 叠化进 lantern_workshop：九婆蹲在地上收旧灯骨，墙上挂满旧灯骨，角落立着奶奶那条没扎完的鳌鱼灯（r3 半成品态），蒙灰。'
-      ),
-      stage('声音：laoxu_street → lantern_workshop 黄昏版。'),
+      stage('画面：laoxu_street 黄昏空街。阿禾正在拉下工作室的卷帘门，看见他，停住。'),
+      stage('声音：laoxu_street 黄昏版。'),
       nar('出站口的风里有稻草味。老街尽头，阿禾正在关店门。'),
       nar('我发小，去年回镇上开了间工作室。'),
       stage('（她看见我，愣了一下）'),
       say('阿禾', '回来了？'),
       stage('（她把卷帘门又推上去）'),
       say('阿禾', '晚上来灯坊吧。我给你看样东西。'),
+    ],
+    nextNodeId: 'C1-2b',
+  },
+
+  /* ============ C1-2b｜奶奶的灯坊（鳌鱼灯半成品） ============ */
+  {
+    id: 'C1-2b',
+    chapter: CHAPTER,
+    sectionTitle: 'C1-2b｜奶奶的灯坊',
+    scene: 'lantern_workshop',
+    lines: [
+      stage('【C1-2b】奶奶的灯坊'),
+      stage(
+        '画面：叠化进 lantern_workshop：九婆蹲在地上收旧灯骨，墙上挂满旧灯骨，角落立着奶奶那条没扎完的鳌鱼灯（r3 半成品态），蒙灰。'
+      ),
+      stage('声音：lantern_workshop 黄昏版。'),
       nar('奶奶的灯坊没锁。她走后三年，灯架上还挂着那条没扎完的鳌鱼——'),
       nar('龙首是几根光秃秃的竹篾，鳞只画了一半。'),
       nar('九婆说，不是奶奶扎不完。'),
@@ -169,6 +187,8 @@ export const c1Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C1-4b｜货架（符号位置）',
     scene: 'gift_shop',
+    // 背景图 bg_gift_shop.webp 里阿禾正伸手拿手机壳 → 不再叠立绘
+    backdropCast: ['阿禾'],
     lines: [
       stage('【C1-4b】货架｜符号位置'),
       stage('画面：gift_shop。满架鳞纹商品，色彩鲜艳；阿禾站在货架前拿起一只手机壳。'),
@@ -210,6 +230,11 @@ export const c1Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C1-5｜灯坊门口（困境收束）',
     scene: 'lantern_workshop',
+    // 与 C1-2 同为灯坊，但这一节点在「门口·夜色」：用单屏图覆盖场景图（2026-10-21）
+    backdrop: 'ch1/C1-5_workshop_door.webp',
+    // 该图本身已画出九婆（坐门槛编竹篾）与知遥（背影）：
+    // 背景已有人物时不出立绘，否则同一人出现两次（`backdropCast` 机制）
+    backdropCast: ['九婆', '知遥'],
     endOfAct: true,
     lines: [
       stage('【C1-5】灯坊门口｜困境收束'),

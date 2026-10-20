@@ -360,13 +360,22 @@ try {
     ashunProbe ? `${ashunProbe.src} ${ashunProbe.w}x${ashunProbe.h}` : '未出现'
   )
 
-  /* ===== F2. 阿鲟与人物同屏不重叠（用户点名的第一幕：阿禾 + 阿鲟） ===== */
+  /* ===== F2. 阿鲟与人物同屏不重叠（用户点名的第一幕：阿禾 + 阿鲟） =====
+     2026-10-21 背景图接入后，C1-4b 的 `bg_gift_shop.webp` 里已经画着阿禾，
+     按 `backdropCast` 机制该节点不再出阿禾立绘（见 ⑦-5），因此同屏用例
+     改用 **C2-BB**（阿禾与阿鲟都有台词）——直接注入存档跳过去。 */
   await freshBoot()
   await jumpTo('C1-1')
-  await advanceToNode(['C1-3'])
-  await sleep(500)
-  await ev(`[...document.querySelectorAll('.btn.choice:not([disabled])')].find(b=>b.textContent.includes('文创店'))?.click()`)
-  await advanceToNode(['C1-4b'], 60000)
+  await ev(`(() => {
+    const k = 'chuandengren.save.v4';
+    const s = JSON.parse(localStorage.getItem(k) || '{}');
+    s.nodeId = 'C2-BB'; s.phase = 'lines'; s.lineIndex = 0; s.missingNodeId = null;
+    s.state = s.state || {};
+    localStorage.setItem(k, JSON.stringify(s));
+  })()`)
+  await send('Page.reload')
+  await sleep(1500)
+  await ev(`[...document.querySelectorAll('.menu-item')].find(x => x.textContent.includes('继续上次'))?.click()`)
   for (let i = 0; i < 12; i++) {
     if (await ev(`!!document.querySelector('.char-stage .char.is-ashun img')`)) break
     await tap()
@@ -431,6 +440,41 @@ try {
   )
   await send('Emulation.clearDeviceMetricsOverride')
   await sleep(400)
+
+  /* ===== F4. 背景图已画入的角色不再出立绘（`backdropCast`） =====
+     2026-10-21：`bg_gift_shop.webp` 里阿禾正伸手拿手机壳，C1-4b 若再叠立绘
+     会变成"两个人"；引擎按节点上的 `backdropCast` 把她从 cast 里剔除，
+     台面上只应剩阿鲟（台词与名条照常）。 */
+  const bakedCases = [
+    { node: 'C1-4b', hide: '阿禾', keep: '阿鲟' },
+    { node: 'C1-5', hide: '九婆', keep: '阿鲟' },
+  ]
+  const bakedRows = []
+  for (const c of bakedCases) {
+    await ev(`(() => {
+      const k = 'chuandengren.save.v4';
+      const s = JSON.parse(localStorage.getItem(k) || '{}');
+      s.nodeId = '${c.node}'; s.phase = 'lines'; s.lineIndex = 0; s.missingNodeId = null;
+      s.state = s.state || {};
+      localStorage.setItem(k, JSON.stringify(s));
+    })()`)
+    await send('Page.reload')
+    await sleep(1500)
+    await ev(
+      `[...document.querySelectorAll('.menu-item')].find(x => x.textContent.includes('继续上次'))?.click()`
+    )
+    await sleep(700)
+    const r = await ev(`(() => {
+      const srcs = [...document.querySelectorAll('.char-stage .char img')].map(i => i.getAttribute('src') || '');
+      return { srcs, hasHide: srcs.some(s => s.includes('ahe') || s.includes('jiupo')) };
+    })()`)
+    bakedRows.push({ ...c, ...(r ?? { srcs: [], hasHide: null }) })
+  }
+  check(
+    '⑦-5 背景图已画入的角色不出立绘（C1-4b 阿禾／C1-5 九婆）',
+    bakedRows.every((r) => r.hasHide === false && r.srcs.some((s) => s.includes('ashun'))),
+    bakedRows.map((r) => `${r.node}:${r.srcs.map((s) => s.split('/').pop()).join('+')}`).join('｜')
+  )
 
   /* ===== G. 移动端 ===== */
   await send('Emulation.setDeviceMetricsOverride', {

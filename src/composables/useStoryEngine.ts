@@ -24,7 +24,7 @@
 import { computed, reactive, ref } from 'vue'
 import { START_NODE_ID, getNode, nodeProgress } from '@/data/story'
 import { useSettings } from '@/composables/useSettings'
-import { CAST_MAX, canStandOnStage, limitCast } from '@/data/characters'
+import { CAST_MAX, canStandOnStage, limitCast, stripBackdropCast } from '@/data/characters'
 import { ASHUN_FALLBACK_LINES } from '@/data/fallbackDialogue'
 import { buildStanceReportLine } from '@/utils/report'
 import {
@@ -343,6 +343,8 @@ export function useStoryEngine() {
       // 同场景合并：**本节点说话人先占位**（说谁就看见谁），余下名额按优先级补
       cast.value = limitCast([...cast.value, ...nodeSpeakers], CAST_MAX, nodeSpeakers)
     }
+    // 背景图内已画入的角色不再出立绘（否则同一人出现两次，见 backdropCast 注释）
+    cast.value = stripBackdropCast(cast.value, n)
     nodeId.value = id
     state.currentNodeId = id
     if (!state.visitedNodes.includes(id)) state.visitedNodes.push(id)
@@ -753,6 +755,8 @@ export function useStoryEngine() {
         // 与 enterNode 同规则：本节点说话人先占位
         n.cast ? n.cast : speakersOf(n)
       )
+      // 与 enterNode 同规则：背景图内已画入的角色不再出立绘
+      cast.value = stripBackdropCast(cast.value, n)
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       if (data.phase === 'ai') {
         // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用判定

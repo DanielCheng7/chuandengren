@@ -148,3 +148,25 @@ export function limitCast(list: string[], max = CAST_MAX, pin: string[] = []): s
   // ③ 还原原顺序 → 站位稳定
   return uniq.filter((s) => kept.has(s))
 }
+
+/**
+ * 剔除**背景图里已经画进去的角色**（`StoryNode.backdropCast`）。
+ *
+ * 背景是实拍／插画时常常自带人物：`bg_gift_shop.webp` 里阿禾正伸手拿手机壳、
+ * `ch1/C1-5_workshop_door.webp` 里九婆坐在门槛上编竹篾。这些角色若再叠立绘，
+ * 画面里就会出现"两个人"。所以凡是背景已画入的角色，一律不再出立绘，
+ * 台词与名条照常显示（对白框里的名字不受影响）。
+ *
+ * @param list 已按上限裁好的 cast
+ * @param node 当前节点（读 `backdropCast`；未配置时原样返回）
+ */
+export function stripBackdropCast(
+  list: string[],
+  node: { backdropCast?: string[] }
+): string[] {
+  const baked = node.backdropCast
+  if (!baked || baked.length === 0) return list
+  const skip = new Set(baked)
+  const out = list.filter((s) => !skip.has(s))
+  return out.length === list.length ? list : out
+}
