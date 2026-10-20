@@ -33,7 +33,7 @@ DST_DIR = os.path.join(BASE, 'public', 'assets', 'characters')
 CHARS = [
     ('九婆', 'char-jiupo', 'human'),
     ('阿禾', 'char-ahe', 'human'),
-    ('知遥', 'char-lin-zhiyao-b', 'human'),
+    ('林知遥', 'char-lin-zhiyao-b', 'human'),
     ('周经理', 'char-zhou', 'human'),
     ('阿鲟', 'char-ashun', 'lamp'),   # 横卧鱼灯：按宽度缩放，避免按高度撑满画面
 ]
@@ -65,8 +65,14 @@ for src_base, dst_base, mode in CHARS:
         src_name = f'{src_base}_{side_cn}.png'
         src_path = os.path.join(SRC_DIR, src_name)
         if not os.path.exists(src_path):
-            print(f'跳过（源文件不存在）：{src_name}')
-            continue
+            # 该角色只给了一张通用图时，左右站位共用（2026-10-20 周经理即此情况）
+            generic = os.path.join(SRC_DIR, f'{src_base}.png')
+            if os.path.exists(generic):
+                src_path = generic
+                src_name = f'{src_base}.png（左右共用）'
+            else:
+                print(f'跳过（源文件不存在）：{src_name}')
+                continue
 
         im = Image.open(src_path).convert('RGBA')
         alpha = im.split()[-1]
