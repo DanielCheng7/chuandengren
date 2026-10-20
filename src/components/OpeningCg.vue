@@ -32,23 +32,38 @@ interface Caption {
   text: string
   /** normal：常规；step：四道工单字；credit：落版；note：角落小字 */
   kind?: 'normal' | 'step' | 'credit1' | 'credit2' | 'note'
+  /** 淡入淡出时长（ms）。短镜头用快切，避免"清晰时间"被淡变吃掉 */
+  fade?: number
 }
 
 const CAPTIONS: Caption[] = [
-  { from: 0.2, to: 2.4, text: '粤西 · 遂溪 · 北坡老圩' },
-  { from: 2.7, to: 5.4, text: '旱坡地上，水向天借。' },
-  { from: 5.7, to: 8.9, text: '三百年前，鱼扎进了灯里。' },
-  // S4a–S4d：四连快切，逐镜单字对位（跨镜停留会错位）
-  { from: 9.1, to: 9.9, text: '选竹', kind: 'step' },
-  { from: 10.1, to: 11.1, text: '扎骨', kind: 'step' },
-  { from: 11.3, to: 12.3, text: '糊纸', kind: 'step' },
-  { from: 12.5, to: 13.7, text: '绘鳞', kind: 'step' },
+  // S1：等火苗光晕展开再出字（0.35），不抢画面
+  { from: 0.35, to: 2.4, text: '粤西 · 遂溪 · 北坡老圩' },
+  { from: 2.8, to: 5.4, text: '旱坡地上，水向天借。' },
+  { from: 5.9, to: 8.9, text: '三百年前，鱼扎进了灯里。' },
+  /**
+   * S4a–S4d：四连硬切，**逐镜单字且首尾无缝相接**。
+   * 每条窗口＝所属镜头全长（略让出切点前后的画面），配合 100ms 快淡变，
+   * 保证每个工序词有 ≈1 秒完整可读时间（旧版 300ms 淡变只剩 200ms，来不及看）。
+   */
+  { from: 9.1, to: 10.1, text: '选竹', kind: 'step', fade: 100 },
+  { from: 10.1, to: 11.3, text: '扎骨', kind: 'step', fade: 100 },
+  { from: 11.3, to: 12.5, text: '糊纸', kind: 'step', fade: 100 },
+  { from: 12.5, to: 13.85, text: '绘鳞', kind: 'step', fade: 100 },
   // S5 点亮：无字幕，让画面说话
-  { from: 17.5, to: 22.9, text: '正月十四、十五，百鱼成河。' },
-  { from: 23.2, to: 26.8, text: '鱼化龙，旱地人的愿。' },
-  // S8 落版：两行依次淡入
-  { from: 27.4, to: 30.0, text: '元宵节（遂溪北坡游鱼）', kind: 'credit1' },
-  { from: 28.3, to: 30.0, text: '广东省第七批省级非物质文化遗产 · 2018', kind: 'credit2' },
+  // S6：俯拍推镜建立后再出字（+0.5），给"灯河成形"一点时间
+  { from: 17.8, to: 22.9, text: '正月十四、十五，百鱼成河。' },
+  // S7：鱼灯举过头顶再出字（+0.4）
+  { from: 23.4, to: 26.85, text: '鱼化龙，旱地人的愿。' },
+  // S8 落版：两行依次淡入，淡变放慢（收尾要稳）
+  { from: 27.5, to: 30.0, text: '元宵节（遂溪北坡游鱼）', kind: 'credit1', fade: 600 },
+  {
+    from: 28.4,
+    to: 30.0,
+    text: '广东省第七批省级非物质文化遗产 · 2018',
+    kind: 'credit2',
+    fade: 600,
+  },
 ]
 
 const now = ref(0)
@@ -120,6 +135,7 @@ onUnmounted(() => {
         :key="c.text"
         class="cg-caption"
         :class="`kind-${c.kind ?? 'normal'}`"
+        :style="{ '--cap-fade': `${c.fade ?? 300}ms` }"
       >
         {{ c.text }}
       </p>
@@ -219,9 +235,10 @@ onUnmounted(() => {
   color: rgba(245, 239, 226, 0.8);
 }
 
+/* 淡变时长逐条可配（--cap-fade）：短镜头快切、落版放慢 */
 .cap-enter-active,
 .cap-leave-active {
-  transition: opacity 300ms ease;
+  transition: opacity var(--cap-fade, 300ms) ease;
 }
 
 .cap-enter-from,
