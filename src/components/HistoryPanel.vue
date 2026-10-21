@@ -11,13 +11,30 @@
  *  - **美化滚动条**（浅轨 + 纸白滑块）；**右下「返回」胶囊**（参考图 Back）。
  * 关闭方式仍三条：返回按钮 + 点击遮罩 + Esc（UI 设计书 §4.9）。
  */
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import type { HistoryEntry } from '@/composables/useStoryEngine'
 import { getNode } from '@/data/story'
 import { speakerTone } from '@/utils/speakerTone'
 
 const props = defineProps<{ entries: HistoryEntry[] }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
+
+/** 滚动容器（打开时定位到最新一句，而不是从头看） */
+const listEl = ref<HTMLElement | null>(null)
+
+/**
+ * 打开回看即**定位到最新剧情进度**（2026-10-21 用户要求）。
+ *
+ * 直接跳到底、不加平滑动画：回看的用途是"刚才那句是什么"，
+ * 滚动动画反而拖慢。`document.fonts.ready` 后再补一次——霞鹜文楷是分包加载的，
+ * 字体到位后行高会变，只滚一次可能差出半行。
+ */
+async function scrollToLatest() {
+  await nextTick()
+  const el = listEl.value
+  if (!el) return
+  el.scrollTop = el.scrollHeight
+}
 
 function onKeydown(ev: KeyboardEvent) {
   if (ev.key === 'Escape') {
@@ -26,7 +43,11 @@ function onKeydown(ev: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  void scrollToLatest()
+  document.fonts?.ready?.then(() => void scrollToLatest()).catch(() => {})
+})
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 /** 名字行：仅对白与短信显示（与对话框一致）；台词行在回看里同样以「」呈现 */
@@ -87,7 +108,7 @@ const rows = computed<Row[]>(() => {
         <p class="title-en">HISTORY</p>
       </header>
 
-      <div class="list">
+      <div ref="listEl" class="list">
         <p v-if="entries.length === 0" class="empty">还没有可回看的内容。</p>
         <template v-for="row in rows" :key="row.key">
           <!-- 幕分组标题：同幕记录只在组首标一次 -->

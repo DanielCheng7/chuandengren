@@ -283,9 +283,9 @@ try {
   const nightNow = await probe()
   const nightWho = await ev(`[...document.querySelectorAll('.char-stage .char')].map((el) => el.classList.contains('is-ashun') ? '阿鲟' : '人物')`)
   check(
-    '④ 换场景重建＋逐行出场：进夜市摊空台，翻到阿鲟那句才出现（左站位素材）',
+    '④ 换场景重建＋逐行出场：进夜市摊空台，翻到阿鲟那句才出现（右站位素材）',
     !!night && nightEntry === 0 && nightNow?.count === 1 && nightWho?.[0] === '阿鲟' &&
-      (nightNow?.rects?.[0]?.src || '').includes('char-ashun-left'),
+      (nightNow?.rects?.[0]?.src || '').includes('char-ashun-right'),
     `进门${nightEntry}人｜node=${nightNow?.nodeId} 场上=${JSON.stringify(nightWho)} ${(nightNow?.rects?.[0]?.src || '').split('/').pop()}`
   )
   await shot('02-night-stall')

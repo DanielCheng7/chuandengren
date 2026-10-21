@@ -371,6 +371,17 @@ try {
     heads.some((h) => h.includes('序章·一盏灯的一生')) &&
     heads.some((h) => h.includes('第一章·灯往何处去'))
   check('⑥ 回看按章分组（序章 + 第一章）', okHeads, JSON.stringify(heads))
+  // 2026-10-21 用户要求：打开回看即定位到**最新进度**（滚到底），不要从头显示
+  const sc = await evaluate(`(() => {
+    const el = document.querySelector('.list');
+    if (!el) return null;
+    return { top: Math.round(el.scrollTop), h: Math.round(el.clientHeight), sh: Math.round(el.scrollHeight) };
+  })()`)
+  check(
+    '⑥-2 回看打开时定位到最新进度（已滚到底部）',
+    !!sc && sc.top > 0 && sc.top + sc.h >= sc.sh - 4,
+    sc ? `scrollTop=${sc.top} 视高=${sc.h} 内容高=${sc.sh}` : '未找到 .list'
+  )
   await screenshot('history')
   await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`)
   await sleep(300)
