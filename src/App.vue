@@ -52,7 +52,7 @@ function finishCg() {
 const showTitle = computed(() => cgStage.value === 'idle' && view.value === 'title')
 
 /**
- * BGM 驱动：标题页 → 标题曲；CG／黑场 → 静音让位（`开场CG.mp4` 自带音轨，避免双层配乐）；
+ * BGM 驱动：标题页 → 标题曲；CG／黑场 → 静音让位（`开场CG_字幕版.mp4` 自带音轨，避免双层配乐）；
  * 剧情与结局 → 剧情曲（结局沿用不切曲，免得把情绪掐断）。
  */
 const { playBgm, suspendBgm, resumeBgm } = useAudio()
