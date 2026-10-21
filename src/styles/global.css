@@ -45,9 +45,9 @@
   --shadow-lift: 0 18px 40px rgba(8, 14, 28, 0.4);
   --safe-b: env(safe-area-inset-bottom, 0px);
 
-  /* 正文字号缩放：玩家档位（小 0.9 / 标准 1 / 大 1.2）× 全局基准 1.1，由 useSettings 写入；
+  /* 正文字号缩放：玩家档位（小 0.9 / 标准 1 / 大 1.2）× 全局基准 1.2，由 useSettings 写入；
      这里的兜底值＝「标准」档，与 JS 写入值一致，避免首帧跳变 */
-  --font-scale: 1.1;
+  --font-scale: 1.2;
 }
 
 * {

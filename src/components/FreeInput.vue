@@ -104,7 +104,7 @@ function pickPreset(id: string) {
   margin: 0;
   text-align: center;
   font-family: var(--font-title);
-  font-size: 20px;
+  font-size: calc(20px * var(--font-scale));
   color: var(--gold);
   letter-spacing: 0.06em;
 }
@@ -275,7 +275,7 @@ function pickPreset(id: string) {
 
 .preset .label {
   color: var(--text);
-  font-size: 19px; /* 与选项同号（2026-10-16 整体加大） */
+  font-size: calc(19px * var(--font-scale)); /* 与选项同号，2026-10-21 接入全局字号 */
   line-height: 1.55;
   text-shadow: 0 1px 10px rgba(8, 14, 28, 0.5);
   transition: color 0.28s ease;

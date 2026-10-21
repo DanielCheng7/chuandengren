@@ -228,7 +228,7 @@ const rows = computed<Row[]>(() => {
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px 10px;
-  font-size: 17px;
+  font-size: calc(17px * var(--font-scale));
   line-height: 1.8;
   color: var(--text);
 }
@@ -236,7 +236,7 @@ const rows = computed<Row[]>(() => {
 .who {
   flex: none;
   font-family: var(--font-title);
-  font-size: 17.5px;
+  font-size: calc(17.5px * var(--font-scale));
   font-weight: 600;
   letter-spacing: 0.06em;
 }

@@ -155,7 +155,7 @@ function pick(id: string) {
 
 .label {
   color: var(--text);
-  font-size: 19px; /* 2026-10-16 用户决议：整体再加大 */
+  font-size: calc(19px * var(--font-scale)); /* 2026-10-21 接入全局字号（原 19px 固定） */
   line-height: 1.55;
   text-shadow: 0 1px 10px rgba(8, 14, 28, 0.5);
   transition: color 0.28s ease;

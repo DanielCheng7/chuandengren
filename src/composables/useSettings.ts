@@ -61,10 +61,11 @@ let singleton: SettingsBundle | null = null
 
 /**
  * 全局字号基准倍率（叠加在玩家档位之上）。
- * 2026-10-19 用户要求「默认字体再改大」：对白 20px → 22px、字卡 22px → 24.2px，
- * 对白框高度随 `--font-scale` 等比联动，不必逐处改 px。
+ * 2026-10-19 用户要求「默认字体再改大」：+10%（对白 20px → 22px）。
+ * **2026-10-21 用户要求「全局字体加大」：1.1 → 1.2**，对白约 24px、名字约 25px、
+ * 字卡约 26.4px，对白框随 `--font-scale` 等比联动（立绘靠实测 `--dbox-top` 自动适配）。
  */
-const FONT_BASE = 1.1
+const FONT_BASE = 1.2
 
 export interface SettingsBundle {
   settings: Settings
