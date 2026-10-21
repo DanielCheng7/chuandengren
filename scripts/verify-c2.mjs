@@ -174,11 +174,12 @@ try {
   )
   await shot('c2-0-round2')
 
-  /* ③ 选 B → C2-B → 自动进 C2-X */
+  /* ③ 选 B → C2-B → 自动进 C2-X2（触点①） */
   await ev(`[...document.querySelectorAll('.btn.choice')].find(b => b.textContent.includes('阿禾'))?.click()`)
   await advanceUntil((x) => x.nodeId === 'C2-B')
-  s = await advanceUntil((x) => x.nodeId === 'C2-X' && x.phase === 'input')
-  check('③ 选「阿禾」→ C2-B → 自动进入 C2-X（触点①）', !!s, `nodeId=${s?.nodeId} phase=${s?.phase}`)
+  // 2026-10-21 按镜头拆节点后，触点落在 C2-X2（C2-X 只演门口相遇）
+  s = await advanceUntil((x) => x.nodeId === 'C2-X2' && x.phase === 'input')
+  check('③ 选「阿禾」→ C2-B → 自动进入 C2-X2（触点①）', !!s, `nodeId=${s?.nodeId} phase=${s?.phase}`)
 
   /* ④ C2-X 界面：3 预设 + 跳过 */
   await sleep(600)

@@ -228,25 +228,27 @@ try {
     mobile: false,
   })
 
-  /* ===== A. 旁白常驻：C2-A（九婆）整节点逐行采样 =====
+  /* ===== A. 旁白常驻：C2-A2（九婆）整节点逐行采样 =====
      2026-10-21：第一章改为**逐行立绘**（阿禾只在「回来了？」一句出现，C1-2 进门是空台），
-     所以「进节点即有立绘、旁白行不消失」这条引擎规则改用**未启用逐行控制**的 C2-A 验证。 */
+     所以「进节点即有立绘、旁白行不消失」这条引擎规则改用**未启用逐行控制**的节点验证。
+     同一批背景落位后 C2-A 的底图里已画着九婆（backdropCast 会剔掉立绘），故改用
+     同场的 **C2-A2**（院子空镜、底图无人），九婆立绘全程在场。 */
   await freshBoot()
   await jumpTo('C1-1')
-  await injectNode('C2-A')
+  await injectNode('C2-A2')
   const c12 = await probe()
   await shot('01-solo-jiupo')
   const rows = await sampleNode(['C2-0'])
   const narRows = rows.filter((r) => !r.name)
   const allOne = rows.every((r) => r.count === 1)
   check(
-    '① 进 C2-A 即有立绘（不等第一句台词）',
+    '① 进 C2-A2 即有立绘（不等第一句台词）',
     c12?.count === 1 && (c12?.rects[0].src || '').includes('char-jiupo'),
     `首行立绘数=${c12?.count} ${(c12?.rects?.[0]?.src || '').split('/').pop()}`
   )
   check(
     '② 旁白行立绘不消失（整节点恒 1 人）',
-    rows.length >= 8 && allOne && narRows.length >= 3,
+    rows.length >= 6 && allOne && narRows.length >= 3,
     `采样 ${rows.length} 行，其中旁白 ${narRows.length} 行；各行立绘数=${[...new Set(rows.map((r) => r.count))].join('/')}`
   )
 
@@ -390,16 +392,17 @@ try {
     ashunProbe ? `${ashunProbe.src} ${ashunProbe.w}x${ashunProbe.h}` : '未出现'
   )
 
-  /* ===== F2. 阿鲟与人物同屏不重叠（用户点名的第一幕：阿禾 + 阿鲟） =====
-     2026-10-21 背景图接入后，C1-4b 的 `bg_gift_shop.webp` 里已经画着阿禾，
-     按 `backdropCast` 机制该节点不再出阿禾立绘（见 ⑦-5），因此同屏用例
-     改用 **C2-BB**（阿禾与阿鲟都有台词）——直接注入存档跳过去。 */
+  /* ===== F2. 阿鲟在场：尺寸档、贴对白框上沿、不套窗口 =====
+     2026-10-21 第二章背景落位后，阿禾在 C1-4b／C2-BB 的底图里都已画入，
+     按 `backdropCast` 机制不再出立绘（见 ⑦-5）——「阿鲟＋人物两人同屏」的用例
+     已无对应节点，两人不重叠改由 `verify-cast-layout` ① 全节点巡检覆盖。
+     这里改用 **C2-X2**（灯坊圆桌，底图含知遥与周经理，场上只有阿鲟一人）。 */
   await freshBoot()
   await jumpTo('C1-1')
   await ev(`(() => {
     const k = 'chuandengren.save.v4';
     const s = JSON.parse(localStorage.getItem(k) || '{}');
-    s.nodeId = 'C2-BB'; s.phase = 'lines'; s.lineIndex = 0; s.missingNodeId = null;
+    s.nodeId = 'C2-X2'; s.phase = 'lines'; s.lineIndex = 0; s.missingNodeId = null;
     s.state = s.state || {};
     localStorage.setItem(k, JSON.stringify(s));
   })()`)
@@ -427,16 +430,16 @@ try {
     return { count: imgs.length, list, overlap, dboxTop: dt, gap: a && dt !== null ? dt - a.bottom : null };
   })()`)
   check(
-    '⑦-2 阿禾 + 阿鲟同屏：左右分列、不重叠（阿鲟无窗口）',
-    both?.count === 2 && both.overlap === false && both.list.some((x) => x.who === '阿鲟'),
-    `${both?.list?.map((x) => `${x.who}@${x.x}-${x.right}`).join('｜')}｜重叠=${both?.overlap}`
+    '⑦-2 阿鲟单独在场：不套窗口黑框、底图已画入的周经理不叠立绘',
+    both?.count === 1 && both.list.every((x) => x.who === '阿鲟'),
+    `${both?.list?.map((x) => `${x.who}@${x.x}-${x.right}`).join('｜')}｜场上 ${both?.count} 人`
   )
   check(
     '⑦-3 阿鲟主体贴在对白框上沿（不压字：0 ≤ 缝 ≤ 24px）',
     both?.gap !== null && both?.gap >= 0 && both?.gap <= 24,
     `阿鲟底=${both?.list?.find((x) => x.who === '阿鲟')?.bottom} 对白顶=${both?.dboxTop} 缝=${both?.gap}px`
   )
-  await shot('06-ashun-and-ahe')
+  await shot('06-ashun-solo')
 
   /* ===== F3. 分辨率稳定性：不同窗口尺寸下阿鲟仍贴住对白框上沿 =====
      用户要求「不同分辨率与窗口尺寸下位置保持稳定」：分别切成 1280×720 与
@@ -554,7 +557,7 @@ try {
   })
   await freshBoot()
   await jumpTo('C1-1')
-  await injectNode('C2-A')
+  await injectNode('C2-A2')
   await sleep(400)
   const mNow = await probe()
   const mRect = mNow?.rects?.[0]

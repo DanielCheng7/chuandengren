@@ -9,8 +9,8 @@ import { AUDIO_MOCK } from './lib/audio-mock.mjs'
  * 覆盖（2026-10-18 用户要求「每个选项都跑一遍」）：
  *   A. C1-3 三错位 **6 种观看顺序**：每轮都弹选项、选项递减 3→2→1、
  *      每轮衔接语正确、所选分支进入对应 C1-4x、最终汇合 C1-5 且 c1Order 与所选顺序一致；
- *   B. C2-0 两条路 **2 种顺序**：第一次选择后回 C2-0 只剩另一条，第二次后自动进 C2-X；
- *   C. C2-X **4 路**：预设 A→C2-AA、B→C2-BB、C→C3-1、跳过→C3-1；
+ *   B. C2-0 两条路 **2 种顺序**：第一次选择后回 C2-0 只剩另一条，第二次后自动进 C2-X／C2-X2（触点）；
+ *   C. C2-X2（触点①）**4 路**：预设 A→C2-AA、B→C2-BB、C→C3-1、跳过→C3-1；
  *   D. C3-4 **3 路**：预设 A／B／C 均不分支直奔 C3-5。
  */
 import { spawn } from 'node:child_process'
@@ -294,7 +294,7 @@ try {
     const toTouch = await advanceToInput()
     check(
       `B. C2 顺序 ${first}→${second}`,
-      n1 === 2 && n2 === 1 && onlyOther && !!toTouch && toTouch.nodeId === 'C2-X',
+      n1 === 2 && n2 === 1 && onlyOther && !!toTouch && toTouch.nodeId === 'C2-X2',
       `首轮=${n1} 次轮=${n2} 仅剩另一条=${onlyOther} 触点=${toTouch?.nodeId}`
     )
     await shot(`c2-order-${order[0]}`)

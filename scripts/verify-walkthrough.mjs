@@ -14,7 +14,7 @@
  *   ① 序章播完自动进 C1-1（不是停在 PRO-6）；
  *   ② C1-3 **三轮都弹选项**（3→2→1），三错位全看；
  *   ③ C1-5 播完进 C2-0；
- *   ④ C2-0 两次进入后进 C2-X；C2-X 预设 A → C2-AA → C3-1；
+ *   ④ C2-0 两次进入后进 C2-X → C2-X2（触点①）；预设 A → C2-AA → … → C3-1；
  *   ⑤ C3-4 触点②出现且选完不分支直奔 C3-5；
  *   ⑥ C3-8 播完自动进 C3-A（不弹选项）；
  *   ⑦ C3-R → C4 → 链 A → 结局页《灯还亮着》；
@@ -246,19 +246,23 @@ try {
     countOf('C2-0') === 2 && afterOf('C2-0') !== 'C2-0' && seq.includes('C2-X'),
     `C2-0 进入 ${countOf('C2-0')} 次，之后 ${seq[seq.lastIndexOf('C2-0') + 1]}`
   )
+  // 2026-10-21 按镜头拆节点：触点在 C2-X2，AA 段拆成 AA→AA2→AA3→AA4→AA5→C3-1
   check(
-    '④-2 C2-X（触点①）→ C2-AA → C3-1',
-    afterOf('C2-X') === 'C2-AA' && afterOf('C2-AA') === 'C3-1',
-    `C2-X → ${afterOf('C2-X')} → ${afterOf('C2-AA')}`
+    '④-2 C2-X → C2-X2（触点①）→ C2-AA …→ C2-AA5 → C3-1',
+    afterOf('C2-X') === 'C2-X2' &&
+      afterOf('C2-X2') === 'C2-AA' &&
+      afterOf('C2-AA') === 'C2-AA2' &&
+      afterOf('C2-AA5') === 'C3-1',
+    `C2-X → ${afterOf('C2-X')} → ${afterOf('C2-X2')} → ${afterOf('C2-AA')} … C2-AA5 → ${afterOf('C2-AA5')}`
   )
 
   /* ⑤ C3-4 触点②之后直奔 C3-5（不分支） */
-  const touchPoints = phaseLog.filter((x) => x === 'C2-X:input').length + phaseLog.filter((x) => x === 'C3-4:input').length
+  const touchPoints = phaseLog.filter((x) => x === 'C2-X2:input').length + phaseLog.filter((x) => x === 'C3-4:input').length
   check(
     '⑤ C3-4 播完进 C3-5（四路不分支）；两处触点各出现 1 次',
     seq.includes('C3-4') &&
       afterOf('C3-4') === 'C3-5' &&
-      phaseLog.filter((x) => x === 'C2-X:input').length === 1 &&
+      phaseLog.filter((x) => x === 'C2-X2:input').length === 1 &&
       phaseLog.filter((x) => x === 'C3-4:input').length === 1,
     `C3-4 → ${afterOf('C3-4')}｜输入界面共 ${touchPoints} 次`
   )
