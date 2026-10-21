@@ -28,7 +28,11 @@ onMounted(() => props.engine.hasSave())
 <template>
   <div class="title-screen grain">
     <!-- 标题页背景视频（队友提供的高清动画；无视频/加载失败时回落渐变背景）。
-         已转码：H.264 / 2560×1440 / 30fps / faststart（原始 2K60 高码率 11.4MB → 3.4MB，便于网页加载） -->
+         现状（2026-10-21 队友替换）：H.264 / 2560×1440 / 5.05s / ≈18 Mbps / **11.4MB** / 无音轨 /
+         faststart。上一版是同一支片子压到 3.4MB 的版本，本次又换回高码率原片——
+         首屏要多下 8MB，建议后续重压到 1080p（CRF 23 左右，约 1.5–2.5MB）。
+         画面是**暖金米色底**，而标题字是纱纸白（#F5EFE2），原样对比度只有 1.6:1（看不清）；
+         故在 CSS 里给视频压暗一档（见 .bg-video 的 filter，实测 0.55 → 3.63:1）。 -->
     <video
       v-if="videoOk"
       class="bg-video"
@@ -88,13 +92,16 @@ onMounted(() => props.engine.hasSave())
   background: radial-gradient(ellipse at 50% 18%, #33517b 0%, #203150 58%, #182541 100%);
 }
 
-/* 背景视频：铺满、覆盖裁剪、不参与交互；其上文字/菜单保持清晰 */
+/* 背景视频：铺满、覆盖裁剪、不参与交互；其上文字/菜单保持清晰。
+   压暗一档：视频是暖金米色底，纱纸白标题压上去只有 1.6:1；0.55 时约 3.6:1（大字够用）。
+   想更亮/更暗只改这一个数——1.0 为原片，0.5 约 4.0:1。 */
 .bg-video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: brightness(0.55) saturate(1.05);
   pointer-events: none;
 }
 
