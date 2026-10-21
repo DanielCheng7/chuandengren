@@ -173,6 +173,18 @@ export function useStoryEngine() {
    * 只在 cast 恰好 1 人时生效；≥2 人按 cast 顺序左→右排，本值忽略。
    */
   const castSide = ref<'left' | 'right'>('left')
+  /**
+   * 正在播的节点内 CG（`StoryNode.cg`）：有值＝全屏视频盖住剧情页，
+   * 等 `finishCg()`（播完或跳过）再继续。2026-10-21 用于 EP 的《灯火正游来》成片。
+   */
+  const activeCg = ref<string | null>(null)
+
+  /** 节点内 CG 播完／被跳过：收起视频，按本节点 nextNodeId 继续 */
+  function finishCg() {
+    if (!activeCg.value) return
+    activeCg.value = null
+    afterLines()
+  }
 
   /**
    * 取「第 idx 行生效的逐行立绘设置」：**沿可见行往前找最近一次 `cast`**。
@@ -360,6 +372,8 @@ export function useStoryEngine() {
       return
     }
     clearHoldTimer()
+    // 换节点即收起上一个节点的 CG（下面若本节点自带 cg 会重新挂上）
+    activeCg.value = null
     missingNodeId.value = null
     // 在场人物：换场景重建／同场景合并／显式 cast 覆盖（见 cast 的注释）
     const prevScene = node.value?.scene
@@ -389,6 +403,12 @@ export function useStoryEngine() {
     // 逐行立绘：本节点若在第 0 行就写了 `cast`，进门即按它生效
     applyLineCast(n, 0)
     phase.value = 'lines'
+    // 节点内插播 CG：进门即播，先不往下走（等 finishCg）
+    if (n.cg) {
+      activeCg.value = n.cg.src
+      persist()
+      return
+    }
     recordLine()
     if (lines.value.length === 0) {
       // 纯图片镜头（序章 montage：无玩家可见文本行但有 backdrop + holdMs）——
@@ -472,6 +492,8 @@ export function useStoryEngine() {
 
   function advance() {
     if (phase.value !== 'lines') return
+    // 节点内 CG 播放中：点击不推进（只能播完或点覆盖层的「跳过」）
+    if (activeCg.value) return
     if (lineIndex.value < lines.value.length - 1) {
       lineIndex.value += 1
       // 逐行立绘：该行若带 `cast`，推进到它就切换在场人物（否则沿用上一行）
@@ -795,6 +817,8 @@ export function useStoryEngine() {
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
       // 逐行立绘：按恢复到的行重算（沿行往前找最近一次 `cast`，与 enterNode/advance 同规则）
       applyLineCast(n, lineIndex.value)
+      // 节点内 CG：刷新恢复时若停在 CG 节点，视频重播（可直接跳过）
+      activeCg.value = n.cg?.src ?? null
       if (data.phase === 'ai') {
         // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用判定
         aiStatus.value = 'failed'
@@ -848,6 +872,7 @@ export function useStoryEngine() {
     sceneKey,
     cast,
     castSide,
+    activeCg,
     history,
     freeInputDone,
     aiStatus,
@@ -870,6 +895,7 @@ export function useStoryEngine() {
     skipMontage,
     hasSave,
     settleEnding,
+    finishCg,
   }
 }
 

@@ -9,8 +9,9 @@
  *   ① 链结束 → EP：三分派**同一段台词**（「传承有千路，灯火同一盏」），只换镜头侧重；
  *   ② 「一日一篾」变体：4 组 (1,2)(2,1)(3,2)(2,3) 触发、措辞按落点（A 版灯坊／B 版省城）；
  *   ③ 非 4 组（如 (3,3) 合流）不触发；
- *   ④ 现实篇 EP-N1–N6 顺序正确、N6 数据口径 981 项／5 项／817 亿次播放；
- *   ⑤ 「跳过现实篇」直达结局页；⑥ 全程无 console 报错。
+ *   ③ 现实篇由成片接管：EP → EP-CG（尾声/EP_字幕版.mp4，1920×1080／58.84s，自带音轨与烧录字幕）；
+ *   ④ 播完／跳过成片后落结局页；⑤ 全程无 console 报错。
+ *   注：EP-N1…N6 的文字节点仍保留在数据里（剧本存档），但已不进主链。
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -183,11 +184,26 @@ try {
     await ev(`[...document.querySelectorAll('.menu-item')].find(x=>x.textContent.includes('继续上次'))?.click()`)
     await sleep(1200)
     const out = []
+    let cg = null
     const t0 = Date.now()
     while (Date.now() - t0 < 180000) {
       const s = await snap()
       if (s?.dbox && !out.includes(s.dbox)) out.push(s.dbox)
-      if (s?.phase === 'end') return { lines: out, snap: s }
+      if (s?.phase === 'end') return { lines: out, snap: s, cg }
+      // 现实篇成片（2026-10-21 起 EP → EP-CG 视频 → END）：录下视频规格后点跳过，别干等 59 秒
+      if (await ev(`!!document.querySelector('.cg-video')`)) {
+        await sleep(500)
+        if (!cg) {
+          cg = await ev(`(() => {
+            const v = document.querySelector('.cg-video');
+            return v ? { src: v.getAttribute('src'), w: v.videoWidth, h: v.videoHeight,
+                         paused: v.paused, duration: Math.round(v.duration * 100) / 100 } : null;
+          })()`)
+        }
+        await ev(`document.querySelector('.cg-skip')?.click()`)
+        await sleep(900)
+        continue
+      }
       if (s?.phase === 'choice') {
         await sleep(450)
         await ev(`document.querySelector('.btn.choice:not([disabled])')?.click()`)
@@ -235,13 +251,17 @@ try {
   )
   await shot('01-epbal-a')
 
+  // 2026-10-21：现实篇文字节点（EP-N1…N6）已由成片取代，改为验证成片本身
+  const cgSrc = decodeURIComponent(a.cg?.src || '')
   check(
-    '③ 现实篇：N6 数据口径 981 项／5 项／817 亿次播放',
-    a.lines.some((t) => t.includes('981 项')) &&
-      a.lines.some((t) => t.includes('5 项人类非遗') || t.includes('人类非遗代表作名录 5 项')) &&
-      a.lines.some((t) => t.includes('817 亿次')) &&
-      a.lines.some((t) => t.includes('这里不是故事')),
-    `N 段句子命中=${a.lines.filter((t) => t.includes('981')).length}`
+    '③ 现实篇由成片接管：EP → EP-CG（1920×1080／58.8s，播放中）',
+    !!a.cg &&
+      cgSrc.includes('尾声/EP_字幕版.mp4') &&
+      a.cg.w === 1920 &&
+      a.cg.h === 1080 &&
+      a.cg.duration > 58 &&
+      a.cg.paused === false,
+    `src=${cgSrc.split('/').pop()} ${a.cg?.w}x${a.cg?.h} ${a.cg?.duration}s paused=${a.cg?.paused}`
   )
   check(
     '④ 现实篇播完落结局页（灯路 + 结局名）',
@@ -279,12 +299,13 @@ try {
   await advanceToInput()
   await ev(`[...document.querySelectorAll('.free-input .preset')][0]?.click()`)
   await sleep(700)
-  // 推进到现实篇第一屏
+  // 推进到现实篇成片（EP-CG）
   {
     const t0 = Date.now()
     while (Date.now() - t0 < 150000) {
       const s = await snap()
-      if (s?.nodeId === 'EP-N1') break
+      if (await ev(`!!document.querySelector('.cg-video')`)) break
+      if (s?.nodeId === 'EP-CG') break
       if (s?.phase === 'input') {
         await sleep(300)
         await ev(`[...document.querySelectorAll('.free-input .preset')][0]?.click()`)
@@ -301,13 +322,17 @@ try {
       await sleep(165)
     }
   }
-  const atN1 = await snap()
-  const hasSkip = atN1?.hasSkipReal === true
+  const atCg = await snap()
+  const hasSkip = await ev(`!!document.querySelector('.cg-skip')`)
   await sleep(300)
-  await ev(`[...document.querySelectorAll('.tool')].find(b=>b.textContent.includes('跳过现实篇'))?.click()`)
+  await ev(`document.querySelector('.cg-skip')?.click()`)
   await sleep(1500)
   const afterSkip = await snap()
-  check('⑦ 现实篇提供「跳过现实篇」并直达结局页', hasSkip && afterSkip?.phase === 'end', `按钮=${hasSkip} phase=${afterSkip?.phase}`)
+  check(
+    '⑦ 现实篇成片可「跳过」并直达结局页',
+    atCg?.nodeId === 'EP-CG' && hasSkip && afterSkip?.phase === 'end',
+    `node=${atCg?.nodeId} 跳过按钮=${hasSkip} phase=${afterSkip?.phase}`
+  )
   await shot('04-skip-real')
 
   check('⑧ 全程无 console 报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))

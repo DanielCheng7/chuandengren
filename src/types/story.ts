@@ -366,6 +366,15 @@ export interface StoryNode {
   nextIf?: { when: Condition[]; nodeId: string }[]
   /** 幕末节点 */
   endOfAct?: boolean
+  /**
+   * **节点内插播 CG 视频**（2026-10-21）：进入本节点即全屏播放该片，
+   * 播完或点「跳过」后才继续（`nextNodeId`）。`src` 相对 `/assets/scenes/`。
+   *
+   * 用法：EP 的「现实篇」文字节点（EP-N1…N6）已被成片取代，
+   * 主链改走一个只放视频的 `EP-CG` 节点（`lines: []` ＋ `cg`），播完直接进结局页。
+   * 视频自带音轨，播放期间 BGM 让位（见 App.vue）。
+   */
+  cg?: { src: string }
   /** 编剧备注 */
   note?: string
 }

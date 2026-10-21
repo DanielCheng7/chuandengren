@@ -6,6 +6,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import EndingScreen from './components/EndingScreen.vue'
 import OpeningCg from './components/OpeningCg.vue'
+import StoryCg from './components/StoryCg.vue'
 import StoryScreen from './components/StoryScreen.vue'
 import TitleScreen from './components/TitleScreen.vue'
 import { useAudio } from './composables/useAudio'
@@ -54,13 +55,16 @@ const showTitle = computed(() => cgStage.value === 'idle' && view.value === 'tit
 /**
  * BGM 驱动：标题页 → 标题曲；CG／黑场 → 静音让位（`开场CG_字幕版.mp4` 自带音轨，避免双层配乐）；
  * 剧情与结局 → 剧情曲（结局沿用不切曲，免得把情绪掐断）。
+ *
+ * 2026-10-21 起加上**节点内 CG**（`StoryNode.cg`，EP 现实篇《灯火正游来》）：
+ * 播放期间同样让位，结束后由下面的 watch 恢复。
  */
 const { playBgm, suspendBgm, resumeBgm } = useAudio()
 
 watch(
-  [cgStage, view],
-  ([stage, v]) => {
-    if (stage !== 'idle') {
+  [cgStage, view, () => engine.activeCg.value],
+  ([stage, v, storyCg]) => {
+    if (stage !== 'idle' || storyCg) {
       suspendBgm()
       return
     }
@@ -79,6 +83,13 @@ onUnmounted(() => stageTimers.forEach((t) => window.clearTimeout(t)))
     <div v-if="cgStage !== 'idle'" class="cg-blackout" aria-hidden="true" />
 
     <OpeningCg v-if="cgStage === 'play'" @done="finishCg" />
+
+    <!-- 剧情内 CG（EP 现实篇）：播完或「跳过」后继续 nextNodeId -->
+    <StoryCg
+      v-if="engine.activeCg.value"
+      :src="engine.activeCg.value"
+      @done="engine.finishCg()"
+    />
 
     <Transition name="title-out">
       <TitleScreen v-if="showTitle" :engine="engine" @begin="beginJourney" />

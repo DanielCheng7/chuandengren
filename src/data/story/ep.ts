@@ -46,7 +46,8 @@ export const epNodes: StoryNode[] = [
     ],
     // 达标则先插「一日一篾」变体，否则直接进现实篇
     nextIf: [{ when: [{ key: 'balancedEp', eq: true }], nodeId: 'EP-BAL' }],
-    nextNodeId: 'EP-N1',
+    // 2026-10-21：现实篇改走成片 EP-CG（文字版 EP-N1…N6 保留在数据里，暂不进主链）
+    nextNodeId: 'EP-CG',
   },
 
   /* ============ EP-BAL｜「一日一篾」尾声变体 ============ */
@@ -69,7 +70,7 @@ export const epNodes: StoryNode[] = [
       say('九婆', '能亮就行。'),
       card('一日一篾。'),
     ],
-    nextNodeId: 'EP-N1',
+    nextNodeId: 'EP-CG',
   },
 
   /* ============ EP-N1｜现实切换 ============ */
@@ -205,6 +206,26 @@ export const epNodes: StoryNode[] = [
       card('愿每一项岭南非遗，都有永续奔流的长河。'),
     ],
     nextNodeId: 'END',
+  },
+
+  /* ============ EP-CG｜现实篇《灯火正游来》（成片） ============ */
+  {
+    id: 'EP-CG',
+    chapter: CHAPTER,
+    sectionTitle: 'EP-CG｜现实篇《灯火正游来》（成片）',
+    scene: 'fish_parade',
+    /**
+     * 2026-10-21：现实篇改用成片——58.84s／1920×1080／自带音轨、**字幕已烧录**。
+     * 进入本节点即全屏播放，播完或点「跳过」直接进结局页。
+     *
+     * 原来的文字节点 EP-N1…N6（字幕＋旁白脚本）**保留在数据里**当剧本存档，
+     * 但不再进主链，避免玩家把同一段内容看两遍。
+     * 若要退回文字版：把 EP 与 EP-BAL 的 `nextNodeId` 改回 `EP-N1` 即可（两者都在本文件顶部）。
+     */
+    cg: { src: '尾声/EP_字幕版.mp4' },
+    lines: [],
+    nextNodeId: 'END',
+    note: '成片取代文字现实篇；回退方式见上方注释。',
   },
 
   /* ============ END｜结局页入口（工程节点） ============ */
