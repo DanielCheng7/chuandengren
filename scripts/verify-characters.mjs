@@ -292,16 +292,18 @@ try {
   )
   await shot('02-night-stall')
 
-  /* ===== D. 双人分列（E1：九婆 + 阿禾） ===== */
+  /* ===== D. 双人分列（C3-2：九婆 + 阿禾） =====
+     2026-10-21 链 A/B/C 背景落位后，E1 的底图已画入九婆／阿禾／知遥（backdropCast 全剔），
+     场上不再有两人，故双人分列改用无背景图的 C3-2。 */
   await freshBoot()
-  await jumpTo('E1')
-  const duo = await advanceToNode(['E1'])
+  await jumpTo('C3-1')
+  const duo = await advanceToNode(['C3-2'])
   await sleep(500)
   const duoNow = await probe()
   const noOverlap2 =
     duoNow?.count === 2 && duoNow.rects[0].right <= duoNow.rects[1].x + 8
   check(
-    '⑤ 双人分列不重叠（E1 九婆＋阿禾），左槽 -left／右槽 -right',
+    '⑤ 双人分列不重叠（C3-2 九婆＋阿禾），左槽 -left／右槽 -right',
     !!duo &&
       duoNow?.count === 2 &&
       noOverlap2 &&
@@ -309,7 +311,7 @@ try {
       (duoNow.rects[1].src || '').endsWith('-right.webp'),
     duoNow?.rects?.map((r) => `${r.src.split('/').pop()}@${r.x}-${r.right}`).join(' | ') || '无'
   )
-  await shot('03-duo-e1')
+  await shot('03-duo-c3-2')
 
   /* ===== E. 上限 2 人：C3-2 有 4 个说话人 → 只上优先级最高的九婆＋阿禾 ===== */
   await freshBoot()
