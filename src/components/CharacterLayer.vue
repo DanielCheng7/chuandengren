@@ -25,6 +25,8 @@ import type { PortraitSide } from '@/data/characters'
 const props = defineProps<{
   /** 在场角色（引擎 cast，已含阿鲟、已排除第一人称主角） */
   cast?: string[]
+  /** 单人在场时的站位（默认左）。2 人及以上时忽略——按 cast 顺序左→右排 */
+  side?: 'left' | 'right'
 }>()
 
 /** 加载失败的角色（两侧都缺，持久状态） */
@@ -32,8 +34,15 @@ const broken = ref<string[]>([])
 /** 已退回另一侧素材的角色（本侧文件缺失） */
 const flipped = ref<string[]>([])
 
-/** 槽位 → 站位：1 人站左；2 人时第 1 位左、第 2 位右 */
-const sideOf = (i: number): PortraitSide => (i === 0 ? 'left' : 'right')
+/**
+ * 槽位 → 站位：2 人时第 1 位左、第 2 位右；
+ * **1 人时默认左**，但引擎可通过 `side` 指定右侧（2026-10-21「阿鲟单独出现在右侧」）。
+ */
+const sideOf = (i: number): PortraitSide => {
+  if (i > 0) return 'right'
+  // 只有「恰好 1 人」时 side 才有意义：2 人必须一左一右
+  return props.side === 'right' && standers.value.length <= 1 ? 'right' : 'left'
+}
 
 const srcOf = (who: string, i: number) => {
   const base = sideOf(i)
@@ -60,11 +69,13 @@ const standers = computed(() =>
 )
 
 const total = computed(() => standers.value.length)
+/** 单人且显式要求右侧（`.n1` 默认贴左，这里多一个靠右的分支） */
+const isSingleRight = computed(() => total.value === 1 && props.side === 'right')
 const isAshun = (who: string) => who === '阿鲟'
 </script>
 
 <template>
-  <div v-if="total > 0" class="char-stage" :class="`n${total}`">
+  <div v-if="total > 0" class="char-stage" :class="[`n${total}`, { 'single-right': isSingleRight }]">
     <div class="row">
       <div
         v-for="(who, i) in standers"
@@ -107,6 +118,13 @@ const isAshun = (who: string) => who === '阿鲟'
 .char-stage.n1 .row {
   justify-content: flex-start;
   padding-left: 12%;
+}
+
+/* 1 人 + 显式指定右侧（2026-10-21：阿鲟单独出现时靠右，避开底图里画在左侧的人物） */
+.char-stage.n1.single-right .row {
+  justify-content: flex-end;
+  padding-left: 0;
+  padding-right: 12%;
 }
 
 /* 2 人：左右两侧分列（第 1 位左槽、第 2 位右槽） */
@@ -181,6 +199,10 @@ const isAshun = (who: string) => who === '阿鲟'
 @media (max-width: 640px) {
   .char-stage.n1 .row {
     padding-left: 8%;
+  }
+  .char-stage.n1.single-right .row {
+    padding-left: 0;
+    padding-right: 8%;
   }
   .char-stage.n2 .row {
     padding: 0 5%;

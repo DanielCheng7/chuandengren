@@ -409,7 +409,7 @@ onUnmounted(() => {
          挂在 stage 之外、z-index 低于舞台：对白带自然盖住人物下半身，
          也不会给可滚动的 .stage 添滚动条。在场人物由引擎 cast 决定，
          旁白行不改变 cast，所以旁白时立绘不消失。 -->
-    <CharacterLayer :cast="e.cast.value" />
+    <CharacterLayer :cast="e.cast.value" :side="e.castSide.value" />
 
     <!-- 幕间角标水印：仅幕（章）切换时浮出（2.4s 起落，UI 设计书 r4 §6）；
          普通场景切换不再浮出（2026-10-17 用户决议） -->

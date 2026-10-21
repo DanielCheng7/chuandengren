@@ -6,10 +6,11 @@
  *   默认 url = http://127.0.0.1:4173/；开发期可传 http://127.0.0.1:5173/
  *
  * 验证点（2026-10-19 用户要求：立绘整场常驻，不在旁白时消失）：
- *   ① 进场景即有立绘（不等第一句台词）；
- *   ② **旁白行立绘不消失**：C1-2 逐行采样，场上有名字的 11 行里立绘数量恒为 1；
- *   ③ 版式：单人 ≈88vh、**首次登场在左侧**、底边越过对白带顶（腿被裁）、水平不出画；
- *   ④ 换场景重建：夜市摊（只有阿鲟）→ 无人物立绘；
+ *   ① 进场景即有立绘（不等第一句台词）——**用 C2-A 验**：第一章自 2026-10-21 起
+ *     改为逐行立绘（阿禾只在「回来了？」一句），进门本来就是空台；
+ *   ② **旁白行立绘不消失**：C2-A 逐行采样，立绘数量恒为 1；
+ *   ③ 版式：单人 ≈88vh、首次登场在左侧、底边越过对白带顶（腿被裁）、水平不出画；
+ *   ④ 换场景重建 **＋ 逐行出场**：进夜市摊空台，翻到阿鲟那句才出现（左站位素材）；
  *   ⑤ 双人分列不重叠（E1：九婆 + 阿禾）；
  *   ⑥ 三人分列不重叠（C3-2：九婆 + 阿禾 + 周经理；阿鲟按同屏上限让位）；
  *   ⑦ 无立绘角色（管理员）不留空框；阿鲟**并排站台**（无窗口、不与人物重叠）、
@@ -121,6 +122,26 @@ try {
       };
     })()`)
   const tap = () => ev(`document.querySelector('.story .stage')?.click()`)
+  /**
+   * 直接注档跳到某节点第 0 行并从标题页「继续上次」进入。
+   * 2026-10-21 起第一章立绘按行开关，靠一路点过去既慢又可能撞上选项，
+   * 所以这类定点检查统一走注档（loadSave 会按行重算 cast，与正常进入等价）。
+   */
+  const injectNode = async (nid) => {
+    await ev(`(() => {
+      const k = 'chuandengren.save.v4';
+      const s = JSON.parse(localStorage.getItem(k) || '{}');
+      s.nodeId = '${nid}'; s.phase = 'lines'; s.lineIndex = 0; s.missingNodeId = null;
+      s.state = s.state || {};
+      localStorage.setItem(k, JSON.stringify(s));
+    })()`)
+    await send('Page.reload')
+    await sleep(1500)
+    await ev(
+      `[...document.querySelectorAll('.menu-item')].find(x => x.textContent.includes('继续上次'))?.click()`
+    )
+    await sleep(800)
+  }
   const freshBoot = async () => {
     await send('Page.navigate', { url: URL_ })
     await sleep(900)
@@ -178,8 +199,7 @@ try {
     return null
   }
   /** 逐行采样一个节点（直到 nodeId 变化），返回每行的立绘数量与是否旁白 */
-  const sampleNode = async (stopIds, max = 30) => {
-    const rows = []
+  const sampleNode = async (stopIds, max = 30) => {    const rows = []
     for (let i = 0; i < max; i++) {
       const s = await probe()
       if (!s) break
@@ -208,18 +228,21 @@ try {
     mobile: false,
   })
 
-  /* ===== A. 旁白常驻：C1-2 整节点逐行采样 ===== */
+  /* ===== A. 旁白常驻：C2-A（九婆）整节点逐行采样 =====
+     2026-10-21：第一章改为**逐行立绘**（阿禾只在「回来了？」一句出现，C1-2 进门是空台），
+     所以「进节点即有立绘、旁白行不消失」这条引擎规则改用**未启用逐行控制**的 C2-A 验证。 */
   await freshBoot()
   await jumpTo('C1-1')
-  const c12 = await advanceToNode(['C1-2'])
-  await shot('01-solo-ahe') // 先截单人版式（下次推进会到 C1-3，那里是街景无立绘）
-  const rows = await sampleNode(['C1-3'])
+  await injectNode('C2-A')
+  const c12 = await probe()
+  await shot('01-solo-jiupo')
+  const rows = await sampleNode(['C2-0'])
   const narRows = rows.filter((r) => !r.name)
   const allOne = rows.every((r) => r.count === 1)
   check(
-    '① 进 C1-2 即有立绘（不等第一句台词）',
-    c12?.count === 1 && (c12?.rects[0].src || '').includes('char-ahe'),
-    `首行立绘数=${c12?.count}`
+    '① 进 C2-A 即有立绘（不等第一句台词）',
+    c12?.count === 1 && (c12?.rects[0].src || '').includes('char-jiupo'),
+    `首行立绘数=${c12?.count} ${(c12?.rects?.[0]?.src || '').split('/').pop()}`
   )
   check(
     '② 旁白行立绘不消失（整节点恒 1 人）',
@@ -242,7 +265,7 @@ try {
     `图 ${solo?.w}x${solo?.h} @ x=${solo?.x} 底=${solo?.bottom} 对白顶=${c12?.dboxTop} 视高=${c12?.vh}｜${(solo?.src || '').split('/').pop()}`
   )
 
-  /* ===== C. 换场景重建：夜市摊只有阿鲟 → 无人物立绘 ===== */
+  /* ===== C. 换场景重建 ＋ 逐行出场：夜市摊进门空台，翻到阿鲟那句才出现 ===== */
   await freshBoot()
   await jumpTo('C1-1')
   await advanceToNode(['C1-3'])
@@ -250,13 +273,20 @@ try {
   await ev(`[...document.querySelectorAll('.btn.choice:not([disabled])')].find(b=>b.textContent.includes('夜市摊'))?.click()`)
   const night = await advanceToNode(['C1-4c'])
   await sleep(400)
+  // 进节点那一刻：换场景重建 + 本节点 cast: [] → 台上应空
+  const nightEntry = await ev(`document.querySelectorAll('.char-stage .char').length`)
+  for (let i = 0; i < 12; i++) {
+    if (await ev(`!!document.querySelector('.char-stage .char.is-ashun')`)) break
+    await tap()
+    await sleep(200)
+  }
   const nightNow = await probe()
   const nightWho = await ev(`[...document.querySelectorAll('.char-stage .char')].map((el) => el.classList.contains('is-ashun') ? '阿鲟' : '人物')`)
   check(
-    '④ 换场景重建：夜市摊只有阿鲟（无人物立绘，用左站位素材）',
-    !!night && nightNow?.count === 1 && nightWho?.[0] === '阿鲟' &&
+    '④ 换场景重建＋逐行出场：进夜市摊空台，翻到阿鲟那句才出现（左站位素材）',
+    !!night && nightEntry === 0 && nightNow?.count === 1 && nightWho?.[0] === '阿鲟' &&
       (nightNow?.rects?.[0]?.src || '').includes('char-ashun-left'),
-    `node=${nightNow?.nodeId} 场上=${JSON.stringify(nightWho)} ${(nightNow?.rects?.[0]?.src || '').split('/').pop()}`
+    `进门${nightEntry}人｜node=${nightNow?.nodeId} 场上=${JSON.stringify(nightWho)} ${(nightNow?.rects?.[0]?.src || '').split('/').pop()}`
   )
   await shot('02-night-stall')
 
@@ -441,13 +471,13 @@ try {
   await send('Emulation.clearDeviceMetricsOverride')
   await sleep(400)
 
-  /* ===== F4. 背景图已画入的角色不再出立绘（`backdropCast`） =====
-     2026-10-21：`bg_gift_shop.webp` 里阿禾正伸手拿手机壳，C1-4b 若再叠立绘
-     会变成"两个人"；引擎按节点上的 `backdropCast` 把她从 cast 里剔除，
-     台面上只应剩阿鲟（台词与名条照常）。 */
+  /* ===== F4. 背景图已画入的角色不出立绘（`backdropCast`）＋ 逐行立绘（`Line.cast`） =====
+     2026-10-21：`bg_gift_shop.webp` 里阿禾正伸手拿手机壳，C1-4b 若再叠立绘会变成"两个人"；
+     C1-5 的单屏图里画着九婆。这两个节点因此设 `cast: []` 起步，阿鲟要到指定台词才出现。
+     所以本用例改成两段：① 进门空台；② 翻到阿鲟那句，台上只有阿鲟。 */
   const bakedCases = [
-    { node: 'C1-4b', hide: '阿禾', keep: '阿鲟' },
-    { node: 'C1-5', hide: '九婆', keep: '阿鲟' },
+    { node: 'C1-4b', hide: '阿禾' },
+    { node: 'C1-5', hide: '九婆' },
   ]
   const bakedRows = []
   for (const c of bakedCases) {
@@ -464,16 +494,55 @@ try {
       `[...document.querySelectorAll('.menu-item')].find(x => x.textContent.includes('继续上次'))?.click()`
     )
     await sleep(700)
-    const r = await ev(`(() => {
-      const srcs = [...document.querySelectorAll('.char-stage .char img')].map(i => i.getAttribute('src') || '');
-      return { srcs, hasHide: srcs.some(s => s.includes('ahe') || s.includes('jiupo')) };
-    })()`)
-    bakedRows.push({ ...c, ...(r ?? { srcs: [], hasHide: null }) })
+    const srcsOf = () =>
+      ev(`[...document.querySelectorAll('.char-stage .char img')].map(i => i.getAttribute('src') || '')`)
+    const atEntry = (await srcsOf()) ?? []
+    // 翻行找阿鲟（该行才放行立绘）
+    let atLine = atEntry
+    for (let i = 0; i < 20 && !atLine.some((s) => s.includes('ashun')); i++) {
+      await tap()
+      await sleep(200)
+      atLine = (await srcsOf()) ?? []
+    }
+    bakedRows.push({ ...c, atEntry, atLine })
   }
   check(
-    '⑦-5 背景图已画入的角色不出立绘（C1-4b 阿禾／C1-5 九婆）',
-    bakedRows.every((r) => r.hasHide === false && r.srcs.some((s) => s.includes('ashun'))),
-    bakedRows.map((r) => `${r.node}:${r.srcs.map((s) => s.split('/').pop()).join('+')}`).join('｜')
+    '⑦-5 背景已画入者不出立绘：进门空台，翻到指定台词才出阿鲟（C1-4b／C1-5）',
+    bakedRows.every(
+      (r) =>
+        r.atEntry.length === 0 &&
+        r.atLine.some((s) => s.includes('ashun')) &&
+        !r.atLine.some((s) => s.includes('ahe') || s.includes('jiupo'))
+    ),
+    bakedRows
+      .map(
+        (r) =>
+          `${r.node}: 进门${r.atEntry.length}人 → ${r.atLine.map((s) => s.split('/').pop()).join('+') || '无'}`
+      )
+      .join('｜')
+  )
+
+  /* ===== F5. 衔接第二幕的选项弹出前，阿鲟必须已退场 =====
+     C1-5 最后一句写了 `cast: []`；C2-0 与它同场景（lantern_workshop），
+     若不同步清空，引擎的"同场景合并"会把阿鲟带进选项界面。 */
+  await injectNode('C1-5')
+  for (let i = 0; i < 24; i++) {
+    const ph = await ev(`(() => {
+      const hasChoice = !!document.querySelector('.btn.choice');
+      return hasChoice ? 'choice' : 'lines';
+    })()`)
+    if (ph === 'choice') break
+    await tap()
+    await sleep(200)
+  }
+  const optState = await ev(`(() => ({
+    choices: document.querySelectorAll('.btn.choice').length,
+    chars: document.querySelectorAll('.char-stage .char').length,
+  }))()`)
+  check(
+    '⑦-6 衔接第二幕的选项弹出前，阿鲟已退场（C1-5 → C2-0 同场景不残留）',
+    (optState?.choices ?? 0) >= 2 && (optState?.chars ?? -1) === 0,
+    `选项 ${optState?.choices} 个｜场上立绘 ${optState?.chars} 人`
   )
 
   /* ===== G. 移动端 ===== */
@@ -485,7 +554,7 @@ try {
   })
   await freshBoot()
   await jumpTo('C1-1')
-  const m = await advanceToNode(['C1-2'])
+  await injectNode('C2-A')
   await sleep(400)
   const mNow = await probe()
   const mRect = mNow?.rects?.[0]

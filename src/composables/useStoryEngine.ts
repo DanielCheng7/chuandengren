@@ -168,6 +168,37 @@ export function useStoryEngine() {
    * 只收「能站上舞台」的角色（有立绘、非第一人称主角）；阿鲟也算角色。
    */
   const cast = ref<string[]>([])
+  /**
+   * 单人在场时的站位（2026-10-21）：由行的 `castSide` 指定，默认左槽。
+   * 只在 cast 恰好 1 人时生效；≥2 人按 cast 顺序左→右排，本值忽略。
+   */
+  const castSide = ref<'left' | 'right'>('left')
+
+  /**
+   * 取「第 idx 行生效的逐行立绘设置」：**沿可见行往前找最近一次 `cast`**。
+   * 这样刷新恢复（只存了 nodeId + lineIndex）也能算出正确的在场状态，
+   * 不必把 cast 状态也存进档。
+   */
+  function lineCastAt(n: StoryNode | undefined, idx: number): {
+    cast?: string[]
+    side?: 'left' | 'right'
+  } {
+    if (!n) return {}
+    let out: { cast?: string[]; side?: 'left' | 'right' } = {}
+    const list = resolveNodeLines(n)
+    for (let i = 0; i <= idx && i < list.length; i++) {
+      const l = list[i]
+      if (l.cast !== undefined) out = { cast: l.cast, side: l.castSide }
+    }
+    return out
+  }
+
+  /** 把逐行 cast 应用到当前在场状态（`cast: []` ＝本行起全部退场） */
+  function applyLineCast(n: StoryNode | undefined, idx: number) {
+    const lc = lineCastAt(n, idx)
+    if (lc.cast !== undefined) cast.value = stripBackdropCast(limitCast(lc.cast), n ?? {})
+    castSide.value = lc.side ?? 'left'
+  }
 
   /* ---------------- 内部工具 ---------------- */
   /**
@@ -355,6 +386,8 @@ export function useStoryEngine() {
     pendingNext.value = null
     lines.value = resolveNodeLines(n)
     lineIndex.value = 0
+    // 逐行立绘：本节点若在第 0 行就写了 `cast`，进门即按它生效
+    applyLineCast(n, 0)
     phase.value = 'lines'
     recordLine()
     if (lines.value.length === 0) {
@@ -441,6 +474,8 @@ export function useStoryEngine() {
     if (phase.value !== 'lines') return
     if (lineIndex.value < lines.value.length - 1) {
       lineIndex.value += 1
+      // 逐行立绘：该行若带 `cast`，推进到它就切换在场人物（否则沿用上一行）
+      applyLineCast(node.value, lineIndex.value)
       recordLine()
       persist()
       return
@@ -758,6 +793,8 @@ export function useStoryEngine() {
       // 与 enterNode 同规则：背景图内已画入的角色不再出立绘
       cast.value = stripBackdropCast(cast.value, n)
       lineIndex.value = Math.min(data.lineIndex ?? 0, Math.max(0, lines.value.length - 1))
+      // 逐行立绘：按恢复到的行重算（沿行往前找最近一次 `cast`，与 enterNode/advance 同规则）
+      applyLineCast(n, lineIndex.value)
       if (data.phase === 'ai') {
         // 上次卡在 AI 生成中：回到行播放末态，由界面提供备用判定
         aiStatus.value = 'failed'
@@ -810,6 +847,7 @@ export function useStoryEngine() {
     sectionTitle,
     sceneKey,
     cast,
+    castSide,
     history,
     freeInputDone,
     aiStatus,

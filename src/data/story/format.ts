@@ -32,8 +32,30 @@ export const stageIf = (text: string, when: Condition[]): Line => ({
   when,
 })
 
+/**
+ * **逐行立绘开关**（2026-10-21 用户要求「按台词精确控制立绘出现与隐藏」）。
+ *
+ * `cast`：本行起在场人物，写 `[]` 就是本行起全部退场；不传该字段则沿用上一行。
+ * `side`：本行起单人在场时的站位（默认左）。
+ *
+ * 典型写法（第一章）：节点 `cast: []` 把立绘压到最低，再在指定那一句
+ * `say('阿鲟', '…', { cast: ['阿鲟'], side: 'right' })`，下一句 `{ cast: [] }` 退场。
+ */
+export interface ActorCue {
+  cast?: string[]
+  side?: 'left' | 'right'
+}
+
+/** 把 `ActorCue` 摊平成 Line 上的 `cast` / `castSide`（未传则不产生字段） */
+const cue = (actor?: ActorCue): Partial<Line> =>
+  actor && actor.cast !== undefined ? { cast: actor.cast, castSide: actor.side } : {}
+
 /** 旁白（第一人称叙述 / 说明句）——走底部对白框，不加名字 */
-export const nar = (text: string): Line => ({ text, type: 'narration' })
+export const nar = (text: string, actor?: ActorCue): Line => ({
+  text,
+  type: 'narration',
+  ...cue(actor),
+})
 
 /**
  * 带条件的旁白：条件成立才显示（《开发文档》§6.2 `Condition`）。
@@ -42,10 +64,11 @@ export const nar = (text: string): Line => ({ text, type: 'narration' })
 export const narIf = (text: string, when: Condition[]): Line => ({ text, type: 'narration', when })
 
 /** 对白 —— 走底部对白框；台词「」为呈现层包装，数据不带引号 */
-export const say = (speaker: Speaker, text: string): Line => ({
+export const say = (speaker: Speaker, text: string, actor?: ActorCue): Line => ({
   speaker,
   text,
   type: 'dialogue',
+  ...cue(actor),
 })
 
 /**

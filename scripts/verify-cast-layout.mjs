@@ -60,6 +60,28 @@ function collectNodeIds() {
   return ids
 }
 
+/**
+ * 允许「单人站右槽」的节点集合。
+ *
+ * 2026-10-21 起因剧情需要（阿鲟作为数据角色单独浮在右侧）引入**逐行** `side: 'right'`，
+ * 所以「单人在左」不再是绝对规则：节点里只要出现过 `side: 'right'`，
+ * 它的单人状态就允许在右。其余节点仍必须守「单人在左」。
+ */
+function collectRightSideNodes() {
+  const files = ['prologue', 'c1', 'c2', 'c3', 'c4', 'chainA', 'chainB', 'chainC', 'ep']
+  const allow = new Set()
+  for (const f of files) {
+    const txt = readFileSync(new URL(`../src/data/story/${f}.ts`, import.meta.url), 'utf8')
+    const marks = [...txt.matchAll(/^ {4}id: '([A-Za-z0-9.\-]+)'/gm)]
+    for (let i = 0; i < marks.length; i++) {
+      const start = marks[i].index
+      const end = i + 1 < marks.length ? marks[i + 1].index : txt.length
+      if (/side: 'right'/.test(txt.slice(start, end))) allow.add(marks[i][1])
+    }
+  }
+  return allow
+}
+
 async function getWs() {
   for (let i = 0; i < 40; i++) {
     try {
@@ -107,11 +129,13 @@ try {
   const measure = () =>
     ev(`(() => {
       const s = JSON.parse(localStorage.getItem('${SAVE}')||'{}');
-      const rects = [...document.querySelectorAll('.char-stage .char img')].map((i) => {
+      const rects = [...document.querySelectorAll('.char-stage .char')].map((el) => {
+        const i = el.querySelector('img');
         const r = i.getBoundingClientRect();
         const src = i.getAttribute('src') || '';
         return { who: src.replace(/^.*char-|-(left|right)\.webp$/g,''),
                  side: (src.match(/-(left|right)\.webp$/) || [,'?'])[1],
+                 slot: el.dataset.side || '?',
                  x: Math.round(r.x), right: Math.round(r.right), h: Math.round(r.height),
                  bottom: Math.round(r.bottom) };
       });
@@ -170,11 +194,26 @@ try {
     await sleep(1500)
     await ev(`[...document.querySelectorAll('.menu-item')].find(x => x.textContent.includes('继续上次'))?.click()`)
     await sleep(700)
-    const m = await measure()
+    // 2026-10-21 起立绘改为**逐行**开关（`Line.cast`）：第一章不少节点进门是空台，
+    // 所以要往后翻行，翻到有人为止再量版式；整节点始终没人的（纯旁白）跳过即可。
+    let m = await measure()
+    let jumpedOut = false
+    for (let i = 0; i < 25 && (m?.rects?.length ?? 0) === 0; i++) {
+      await ev(`document.querySelector('.story .stage')?.click()`)
+      await sleep(220)
+      m = await measure()
+      // 翻到节点末尾会自动进下一节点——那就不是本节点的版式了，停手并记为「本节点无人」
+      if (m?.nodeId && m.nodeId !== nid) {
+        jumpedOut = true
+        break
+      }
+    }
+    if (jumpedOut) m = { nodeId: nid, rects: [], vw: m?.vw, vh: m?.vh, hasAshun: false }
     rows.push({ nid, count: m?.rects?.length ?? 0, rects: m?.rects ?? [], hasAshun: m?.hasAshun, vw: m?.vw, vh: m?.vh })
   }
 
   /* ---- 逐点判定 ---- */
+  const allowRight = collectRightSideNodes()
   const badOverlap = []
   const badLeft = []
   const firstSeen = new Map()
@@ -187,9 +226,13 @@ try {
         if (!(a.right <= b.x || b.right <= a.x)) badOverlap.push(`${r.nid}: ${a.who} 与 ${b.who} 重叠`)
       }
     }
-    // 单人在左
-    if (r.rects.length === 1 && r.rects[0].x >= r.vw * 0.5) {
-      badLeft.push(`${r.nid}: 单人 ${r.rects[0].who} 在右侧 x=${r.rects[0].x}`)
+    // 单人在左（仅限**没有**显式要求右置的节点；阿鲟这类数据角色可单独在右）
+    if (
+      r.rects.length === 1 &&
+      r.rects[0].x >= r.vw * 0.5 &&
+      !allowRight.has(r.nid)
+    ) {
+      badLeft.push(`${r.nid}: 单人 ${r.rects[0].who} 在右侧 x=${r.rects[0].x}（该节点未声明 side: 'right'）`)
     }
     // 首次登场在左
     for (const rr of r.rects) {
@@ -204,10 +247,13 @@ try {
   }
 
   check('① 全部节点：任意两人不重叠', badOverlap.length === 0, badOverlap.slice(0, 4).join('｜') || `${rows.length} 点已检`)
-  check('② 单人在场时在左侧', badLeft.length === 0, badLeft.slice(0, 4).join('｜') || '无越界')
+  check('② 单人在场时在左侧（显式 side:\'right\' 的节点除外）', badLeft.length === 0, badLeft.slice(0, 4).join('｜') || '无越界')
   // "首次登场默认在左"的落地口径：**每个场景里第一个登场的角色必须在左**，
-  // 其余按登场顺序往右排（两个角色时即左右分列）。单人场景自然也在左。
-  const badFirstSlot = rows.filter((r) => r.rects.length > 0 && r.rects[0].x >= r.vw * 0.5)
+  // 其余按登场顺序往右排（两个角色时即左右分列）。
+  // 例外：节点显式声明了 `side: 'right'`（阿鲟单人在右），该点允许在右。
+  const badFirstSlot = rows.filter(
+    (r) => r.rects.length > 0 && r.rects[0].x >= r.vw * 0.5 && !allowRight.has(r.nid)
+  )
   check(
     '③ 每个场景的首位角色都在左侧',
     badFirstSlot.length === 0,
@@ -225,12 +271,19 @@ try {
       `全 ${rows.length} 点最多 ${Math.max(0, ...rows.map((r) => r.count))} 人`
   )
 
-  // 站位 → 素材：左槽必须用 *-left.webp、右槽必须用 *-right.webp
+  // 站位 → 素材：**槽位必须与素材一一对应**（左槽用 -left、右槽用 -right）。
+  // 单人时槽位由 sideOf() 决定（默认左、可显式指定右），所以按 DOM 的 data-side 判，
+  // 不再假设"第 1 位一定在左"。
   const badSide = []
   for (const r of rows) {
     r.rects.forEach((rr, i) => {
-      const want = i === 0 ? 'left' : 'right'
-      if (rr.side !== want) badSide.push(`${r.nid}: 第 ${i + 1} 位 ${rr.who} 用了 ${rr.side}`)
+      if (rr.slot !== rr.side) {
+        badSide.push(`${r.nid}: ${rr.who} 槽位 ${rr.slot} 却用了 ${rr.side} 素材`)
+      }
+      if (r.rects.length === 2) {
+        const want = i === 0 ? 'left' : 'right'
+        if (rr.slot !== want) badSide.push(`${r.nid}: 第 ${i + 1} 位应占 ${want} 却是 ${rr.slot}`)
+      }
     })
   }
   check(
