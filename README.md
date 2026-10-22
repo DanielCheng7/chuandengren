@@ -164,6 +164,7 @@ npm run dev                    # 启动日志会打 ✅/⚠️ [ai] 上游 … �
 ```
 
 - 协议按 **OpenAI 兼容**写死（`POST {base}/chat/completions`）：换服务商只改 `AI_BASE_URL`/`AI_MODEL`，代码零改动。
+- **思考模型默认关思考**（`AI_THINKING=disabled`，可设 `default` 表示不传该参数）——DeepSeek-V4.1、doubao-seed 这类模型会先吐 `reasoning_content`，token 用尽时 `content` 是空的，判定就废了。
 - 前端只发 `{ prompt, json? }`、收回 `{ text }`；`json:true` 时带 `response_format: json_object`（触点判定要严格 JSON）。
 - **降级链**：代理不存在（纯静态托管）或没配 Key → 前端永久退回 mock；上游真出错 → 一律 `0/0` + 固定回退句，**绝不阻断剧情**；失败原因（含上游原文）透传到 `console.warn`。
 - 纯静态部署时可 `node server/ai-proxy.mjs`（默认 8787）单独起代理，再把 `VITE_AI_ENDPOINT` 指过去。

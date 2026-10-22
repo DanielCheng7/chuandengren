@@ -29,6 +29,17 @@ export function readAiConfig(env = process.env) {
     // 默认 7s：比前端 8s 判定超时早一点，让「上游超时」以 504 干净地回到前端，
     // 而不是浏览器直接 abort（那样控制台只剩一句 AbortError）
     timeoutMs: Number(env.AI_TIMEOUT_MS || 7000),
+    /**
+     * 思考模式：`disabled`（默认）／`auto`／`enabled`／`default`（= 不传该参数）。
+     *
+     * 为什么要能关：DeepSeek-V4.1、doubao-seed 这类**思考模型**会先吐一大段
+     * `reasoning_content`，`content` 在 token 用尽时是空的——判定任务只等 8s，
+     * 又不能容忍空文本。实测 `thinking:{type:'disabled'}` 让 V4.1-Flash 经济版
+     * 1.3s 直出严格 JSON（0 reasoning tokens）。
+     *
+     * 若换到不认这个参数的网关（个别中转会严格校验），设为 `default` 即完全不传。
+     */
+    thinking: (env.AI_THINKING || 'disabled').trim(),
   }
 }
 
@@ -106,6 +117,10 @@ export async function handleAiRequest(req, res, cfg = readAiConfig()) {
         temperature: 0.2,
         max_tokens: 512,
         ...(payload.json ? { response_format: { type: 'json_object' } } : {}),
+        // 思考模型默认关掉（见 readAiConfig）；`default` 表示完全不带这个参数
+        ...(cfg.thinking && cfg.thinking !== 'default'
+          ? { thinking: { type: cfg.thinking } }
+          : {}),
       }),
       signal: ac.signal,
     })
@@ -121,15 +136,23 @@ export async function handleAiRequest(req, res, cfg = readAiConfig()) {
     }
 
     let text = ''
+    let reasoning = ''
     try {
       const data = JSON.parse(raw)
       text = (data?.choices?.[0]?.message?.content ?? '').trim()
+      reasoning = (data?.choices?.[0]?.message?.reasoning_content ?? '').trim()
     } catch {
       sendJson(res, 502, { error: '上游返回不是 JSON', detail: raw.slice(0, 600) })
       return
     }
     if (!text) {
-      sendJson(res, 502, { error: '上游返回空文本', detail: raw.slice(0, 600) })
+      // 思考模型的典型坑：token 全花在 reasoning 上，content 才是空的
+      sendJson(res, 502, {
+        error: reasoning ? '上游只返回了思考内容，没有正文' : '上游返回空文本',
+        detail: reasoning
+          ? `模型在思考态用满了 max_tokens（${cfg.model}）。设 AI_THINKING=disabled，或调大 max_tokens。`
+          : raw.slice(0, 600),
+      })
       return
     }
     sendJson(res, 200, { text })

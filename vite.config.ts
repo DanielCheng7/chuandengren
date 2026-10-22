@@ -112,9 +112,9 @@ function aiRoutePlugin(env: Record<string, string>): Plugin {
 function logAiConfig(cfg: ReturnType<typeof readAiConfig>) {
   const tag = cfg.apiKey && cfg.model ? '✅' : '⚠️'
   console.log(
-    `${tag} [ai] 上游 ${cfg.baseUrl} ｜ 模型 ${cfg.model || '(未配置)'} ｜ Key ${
-      cfg.apiKey ? `已配置(${cfg.apiKey.slice(0, 8)}…)` : '缺失 → 前端走 mock'
-    }`
+    `${tag} [ai] 上游 ${cfg.baseUrl} ｜ 模型 ${cfg.model || '(未配置)'} ｜ 思考 ${
+      cfg.thinking === 'default' ? '不传' : cfg.thinking
+    } ｜ Key ${cfg.apiKey ? `已配置(${cfg.apiKey.slice(0, 8)}…)` : '缺失 → 前端走 mock'}`
   )
 }
 

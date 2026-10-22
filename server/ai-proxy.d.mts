@@ -12,6 +12,8 @@ export interface AiConfig {
   baseUrl: string
   model: string
   timeoutMs: number
+  /** 思考模式：disabled（默认）／auto／enabled／default（不传该参数） */
+  thinking: string
 }
 
 export function readAiConfig(env?: Record<string, string | undefined>): AiConfig
