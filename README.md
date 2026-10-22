@@ -38,10 +38,9 @@ npm run gen:scenes # 重新生成 13 张场景渐变图 grad_<key>.svg
    低版本会在 `npm install` 或启动时直接报错，先升 Node 再装。
 2. **`npm install`**。若卡在 `502` / `ETIMEDOUT`（公司或校园网代理常见），先 `npm config get registry`
    确认没被改，再 `npm install --prefer-offline` 重试——多半是瞬时网络问题。
-3. **要不要真 AI？** 不配也能完整通关：`/api/ai` 返回 503 后前端**自动退回关键词 mock**
-   （守旧/创新两轴按词表粗判），CG、BGM、存档、结局全部正常。
-   要展示真模型判定，就 `cp .env.example .env.local` 并填 `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL`
-   （Key 私下传，**不要提交**），重启 `npm run dev` 看到 `✅ [ai] …` 即生效。
+3. **AI 不用配**：仓库里的 `.env` 带了一份团队共用测试 Key，起服务即可用真模型
+   （日志见 `✅ [ai] …`）。要换成自己的 Key / 模型，建 `.env.local` 覆盖即可（不进 Git）。
+   把 `.env.local` 里的 `AI_API_KEY` 留空，就退回关键词 mock——CG、BGM、存档、结局均不受影响。
 
 
 ---
@@ -162,22 +161,27 @@ app/
 
 ## AI 服务
 
-默认 **mock 模式**（无需 Key 即可跑通：触点是关键词粗判，演示有区分度）。接入真实模型
-**不用另写服务端**——`vite.config.ts` 的 `cdr-ai-route` 插件已在 `/api/ai` 挂好代理
-（实现见 `server/ai-proxy.mjs`），Key 只活在服务端进程里：
+真 AI **开箱即用**：仓库里的 `.env` 已带一份**团队共用测试 Key**（火山方舟，额度很小，
+够跑流程），clone 下来 `npm run dev` 就能用，日志会打：
 
-```bash
-cp .env.example .env.local     # .env.local 已在 .gitignore，不会提交
-# 填三行：
-#   AI_API_KEY=...
-#   AI_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
-#   AI_MODEL=ep-xxxxxxxx       # 方舟推理接入点 ID，或 doubao-… 模型 ID
-npm run dev                    # 启动日志会打 ✅/⚠️ [ai] 上游 … 模型 … Key 已配置
+```
+✅ [ai] 上游 https://ark.cn-beijing.volces.com/api/v3 ｜ 模型 deepseek-v4-1-flash-economy-261017 ｜ 思考 disabled ｜ Key 已配置(ark-e300…)
 ```
 
+想换自己的 Key / 模型，**不要改 `.env`**，建 `.env.local` 覆盖（优先级更高、且不进 Git）：
+
+```bash
+# .env.local —— 个人覆盖，已 gitignore
+AI_API_KEY=自己的Key
+AI_MODEL=自己的模型
+```
+
+- **三层优先级**：`.env.local` > `.env`（共用）> 缺省。想停用共用 Key，`.env.local` 里写 `AI_API_KEY=` 空值即可。
+- 代理实现在 `server/ai-proxy.mjs`，`vite.config.ts` 的 `cdr-ai-route` 挂在 `/api/ai`，**Key 只活在服务端进程，不进浏览器、不进构建产物**。
 - 协议按 **OpenAI 兼容**写死（`POST {base}/chat/completions`）：换服务商只改 `AI_BASE_URL`/`AI_MODEL`，代码零改动。
 - **思考模型默认关思考**（`AI_THINKING=disabled`，可设 `default` 表示不传该参数）——DeepSeek-V4.1、doubao-seed 这类模型会先吐 `reasoning_content`，token 用尽时 `content` 是空的，判定就废了。
 - 前端只发 `{ prompt, json? }`、收回 `{ text }`；`json:true` 时带 `response_format: json_object`（触点判定要严格 JSON）。
-- **降级链**：代理不存在（纯静态托管）或没配 Key → 前端永久退回 mock；上游真出错 → 一律 `0/0` + 固定回退句，**绝不阻断剧情**；失败原因（含上游原文）透传到 `console.warn`。
-- 纯静态部署时可 `node server/ai-proxy.mjs`（默认 8787）单独起代理，再把 `VITE_AI_ENDPOINT` 指过去。
-- `temperature 0.2`、每轴幅度锁 ±1、前端 8s／上游 7s 超时。**任何 API Key 都不得写入前端代码或提交 Git。**
+- **降级链**：代理不存在（纯静态托管）或没配 Key → 前端永久退回 mock（关键词粗判，仍可完整通关）；上游真出错 → 一律 `0/0` + 固定回退句，**绝不阻断剧情**；失败原因（含上游原文）透传到 `console.warn`。
+- 纯静态部署：`node --env-file=.env server/ai-proxy.mjs`（默认 8787）单独起代理，再把 `VITE_AI_ENDPOINT` 指过去。
+- `temperature 0.2`、每轴幅度锁 ±1、前端 8s／上游 7s 超时。
+- **Key 纪律**：`.env` 里只放**低额度测试 Key**（额度异常就去方舟控制台吊销，再把新 Key 更新进 `.env`——旧 Key 会留在 git 历史里，所以**正式 Key 永不入库**，只放 `.env.local`）。

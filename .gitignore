@@ -12,10 +12,15 @@ dist
 dist-ssr
 *.local
 
-# 本地环境变量（AI 代理地址等，严禁提交任何 Key）
-.env
+# 环境变量
+#   ① `.env`   → **进仓库**：团队共用的方舟测试 Key（额度极小、随时可吊销），
+#      队友 clone 下来就能跑真 AI，不用手工配（2026-10-22 团队决定）。
+#   ② `.env.local` / `.env.*.local` → 个人覆盖，永远不进仓库（优先级高于 `.env`）。
+#   ③ 正式/高额度 Key 一律只放 `.env.local`，不要动 `.env`。
 .env.*
+.env.local
 !.env.example
+!.env
 
 # Local verification output (scripts/verify-headless.mjs)
 .verify*
