@@ -2,7 +2,8 @@ import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import type { Connect, Plugin, PreviewServer, ViteDevServer } from 'vite'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
+import { handleAiRequest, readAiConfig } from './server/ai-proxy.mjs'
 
 const AUDIO_DIR = fileURLToPath(new URL('./public/assets/audio/', import.meta.url))
 
@@ -79,20 +80,62 @@ function audioRoutePlugin(): Plugin {
   }
 }
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [vue(), audioRoutePlugin()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+/**
+ * AI 代理路由：`POST /api/ai` → 上游大模型（实现见 `server/ai-proxy.mjs`）。
+ *
+ * 存在的意义只有一个——**Key 不进前端**：浏览器只认同源路径，Key 留在
+ * `.env.local`（已 gitignore）由服务端进程读。dev 与 preview 都挂上，
+ * 这样 `npm run preview` 也能演示真实 AI；纯静态托管时改用
+ * `node server/ai-proxy.mjs` 单独起一个服务，再把 `VITE_AI_ENDPOINT` 指过去。
+ */
+function aiRoutePlugin(env: Record<string, string>): Plugin {
+  return {
+    name: 'cdr-ai-route',
+    configureServer(server: ViteDevServer) {
+      const cfg = readAiConfig(env)
+      logAiConfig(cfg)
+      server.middlewares.use('/api/ai', (req, res) => {
+        void handleAiRequest(req, res, cfg)
+      })
     },
-  },
-  server: {
-    host: true, // 便于用手机在同一局域网访问，测移动端竖屏
-    port: 5173,
-  },
-  build: {
-    // 演示包体积不重要，优先保证可读的报错与稳定的产物
-    sourcemap: true,
-  },
+    configurePreviewServer(server: PreviewServer) {
+      // preview 不再打印，避免与 build 日志混在一起（配置同源，dev 已提示过）
+      const cfg = readAiConfig(env)
+      server.middlewares.use('/api/ai', (req, res) => {
+        void handleAiRequest(req, res, cfg)
+      })
+    },
+  }
+}
+
+/** 启动时报一行配置状态：没配 Key 也能跑（前端自动退 mock），但要让开发知道 */
+function logAiConfig(cfg: ReturnType<typeof readAiConfig>) {
+  const tag = cfg.apiKey && cfg.model ? '✅' : '⚠️'
+  console.log(
+    `${tag} [ai] 上游 ${cfg.baseUrl} ｜ 模型 ${cfg.model || '(未配置)'} ｜ Key ${
+      cfg.apiKey ? `已配置(${cfg.apiKey.slice(0, 8)}…)` : '缺失 → 前端走 mock'
+    }`
+  )
+}
+
+// https://vite.dev/config/
+export default defineConfig(({ mode }) => {
+  // 第三个参数传 '' = 不做 VITE_ 前缀过滤，`AI_*` 这类服务端变量才读得到
+  const env = loadEnv(mode, process.cwd(), '')
+  return {
+    plugins: [vue(), audioRoutePlugin(), aiRoutePlugin(env)],
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
+    server: {
+      host: true, // 便于用手机在同一局域网访问，测移动端竖屏
+      port: 5173,
+    },
+    build: {
+      // 演示包体积不重要，优先保证可读的报错与稳定的产物
+      sourcemap: true,
+    },
+  }
 })

@@ -150,11 +150,21 @@ app/
 
 ## AI 服务
 
-默认 **mock 模式**（无需 Key 即可跑通）。接入真实模型只需提供服务端代理地址：
+默认 **mock 模式**（无需 Key 即可跑通：触点是关键词粗判，演示有区分度）。接入真实模型
+**不用另写服务端**——`vite.config.ts` 的 `cdr-ai-route` 插件已在 `/api/ai` 挂好代理
+（实现见 `server/ai-proxy.mjs`），Key 只活在服务端进程里：
 
 ```bash
-# .env.local（不要提交）
-VITE_AI_ENDPOINT=https://<你的服务端代理>/api/ashun
+cp .env.example .env.local     # .env.local 已在 .gitignore，不会提交
+# 填三行：
+#   AI_API_KEY=...
+#   AI_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+#   AI_MODEL=ep-xxxxxxxx       # 方舟推理接入点 ID，或 doubao-… 模型 ID
+npm run dev                    # 启动日志会打 ✅/⚠️ [ai] 上游 … 模型 … Key 已配置
 ```
 
-代理接收 `{ prompt: string }`，返回 `{ text: string }`（内容为严格 JSON 字符串）。`temperature 0.2`、每轴幅度锁 ±1、8s 超时；非法返回一律落 `0/0` 并继续剧情。**任何 API Key 都不得写入前端代码。**
+- 协议按 **OpenAI 兼容**写死（`POST {base}/chat/completions`）：换服务商只改 `AI_BASE_URL`/`AI_MODEL`，代码零改动。
+- 前端只发 `{ prompt, json? }`、收回 `{ text }`；`json:true` 时带 `response_format: json_object`（触点判定要严格 JSON）。
+- **降级链**：代理不存在（纯静态托管）或没配 Key → 前端永久退回 mock；上游真出错 → 一律 `0/0` + 固定回退句，**绝不阻断剧情**；失败原因（含上游原文）透传到 `console.warn`。
+- 纯静态部署时可 `node server/ai-proxy.mjs`（默认 8787）单独起代理，再把 `VITE_AI_ENDPOINT` 指过去。
+- `temperature 0.2`、每轴幅度锁 ±1、前端 8s／上游 7s 超时。**任何 API Key 都不得写入前端代码或提交 Git。**

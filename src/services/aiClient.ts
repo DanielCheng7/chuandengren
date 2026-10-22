@@ -10,7 +10,8 @@
  *
  * 现状：
  *  - mock 模式：无 API Key 也能完整跑通；
- *  - remote 模式：预留服务端代理接入点（VITE_AI_ENDPOINT），Key 绝不进前端；
+ *  - remote 模式：前端只发同源 `/api/ai`（`vite.config.ts` 的 `cdr-ai-route` 转发上游，
+ *    实现见 `server/ai-proxy.mjs`），**Key 只在服务端 `.env.local`，绝不进前端**；
  *  - 8 秒超时 → 抛 AiTimeoutError，由调用方落到备用文本（不改剧情、不清进度）。
  */
 import type { GameState, Line } from '@/types/story'
@@ -86,9 +87,20 @@ export function fillPrompt(template: string, ctx: Record<string, string>): strin
 
 /* ---------------- 调用入口 ---------------- */
 
+/**
+ * 代理可用性：`unknown` 未探过｜`ok` 通｜`missing` 不存在或未配置。
+ * 探到 `missing` 后本次会话不再请求，直接走 mock —— 保证没有服务端时也能完整演示。
+ */
+let proxyState: 'unknown' | 'ok' | 'missing' = 'unknown'
+
 function endpoint(): string | undefined {
-  // 仅服务端代理地址可进前端；API Key 不得进入任何前端代码
-  return import.meta.env.VITE_AI_ENDPOINT as string | undefined
+  // ① 显式配置优先（前端直连别的代理服务时用）
+  const explicit = import.meta.env.VITE_AI_ENDPOINT as string | undefined
+  if (explicit) return explicit
+  // ② 默认走同源 `/api/ai`：`vite.config.ts` 的 `cdr-ai-route` 把请求转给上游，
+  //    **Key 只在服务端 `.env.local` 里**，前端与构建产物都不含密钥。
+  // ③ 纯静态托管时该路由不存在 → 第一次探到就永久退回 mock，别再白试
+  return proxyState === 'missing' ? undefined : '/api/ai'
 }
 
 /**
@@ -116,15 +128,39 @@ function withTimeout<T>(task: (signal: AbortSignal) => Promise<T>, ms = TIMEOUT_
   })
 }
 
-/** 统一的 POST 调用：非 2xx / 空文本均抛错，由调用方落到备用文本 */
-async function postAiText(url: string, body: unknown, signal: AbortSignal): Promise<string> {
+/**
+ * 统一的 POST 调用：非 2xx / 空文本均抛错，由调用方落到备用文本。
+ * 失败时把代理带回来的 `{error, detail}` 拼进异常消息——控制台一眼能看出
+ * 是 Key 格式错、模型名错还是欠费，不必翻服务端日志。
+ */
+async function postAiText(
+  url: string,
+  body: { prompt: string; json?: boolean },
+  signal: AbortSignal
+): Promise<string> {
   const r = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal,
   })
-  if (!r.ok) throw new Error(`AI 接口异常：${r.status}`)
+  // 404＝没有挂代理（纯静态托管）；503＝代理在但没配 Key/模型。
+  // 两种都算「本次会话没有 AI」，退回 mock，别每个触点再试一次。
+  if ((r.status === 404 || r.status === 503) && !import.meta.env.VITE_AI_ENDPOINT) {
+    proxyState = 'missing'
+    throw new Error(`AI 代理不可用（${r.status}）→ 改用本地 mock`)
+  }
+  if (!r.ok) {
+    let detail = ''
+    try {
+      const j = (await r.json()) as { error?: string; detail?: string }
+      detail = `${j.error ?? ''} ${j.detail ?? ''}`.trim()
+    } catch {
+      /* 上游不是 JSON，忽略 */
+    }
+    throw new Error(`AI 接口异常：${r.status}${detail ? ` — ${detail}` : ''}`)
+  }
+  proxyState = 'ok'
   const data = (await r.json()) as { text?: string }
   const out = (data.text ?? '').trim()
   if (!out) throw new Error('AI 返回为空')
@@ -148,9 +184,14 @@ export async function requestAshunReply(playerAnswer: string, state: GameState):
     }),
   }
 
-  const text = await withTimeout((signal) => postAiText(url, body, signal))
-
-  return { lines: [{ speaker: '阿鲟', text, type: 'dialogue', aiGenerated: true }], source: 'remote' }
+  try {
+    const text = await withTimeout((signal) => postAiText(url, body, signal))
+    return { lines: [{ speaker: '阿鲟', text, type: 'dialogue', aiGenerated: true }], source: 'remote' }
+  } catch (e) {
+    // 没有服务端（静态托管）→ 退回 mock；上游真出错则照旧抛，让引擎走失败态
+    if (proxyState === 'missing') return { lines: mockAshunReply(playerAnswer), source: 'mock' }
+    throw e
+  }
 }
 
 /** 过渡实现：结局页回顾（结局页在步骤 35–38 重做；失败静默省略，不影响固定结局） */
@@ -168,9 +209,13 @@ export async function requestJourneySummary(state: GameState): Promise<AiResult>
     }),
   }
 
-  const text = await withTimeout((signal) => postAiText(url, body, signal))
-
-  return { lines: [{ text, type: 'narration', aiGenerated: true }], source: 'remote' }
+  try {
+    const text = await withTimeout((signal) => postAiText(url, body, signal))
+    return { lines: [{ text, type: 'narration', aiGenerated: true }], source: 'remote' }
+  } catch (e) {
+    if (proxyState === 'missing') return { lines: mockJourneySummary(state), source: 'mock' }
+    throw e
+  }
 }
 
 /* ---------------- 触点双轴判定（C2-X 次触点 / C3-4 主触点） ---------------- */
@@ -249,16 +294,21 @@ export async function requestStanceJudgement(
   const url = endpoint()
   if (!url) return mockStanceJudge(answer)
   try {
-    const body = {
-      prompt: fillPrompt(PROMPT_STANCE_JUDGE, {
-        playerAnswer: answer,
-        storyContext: `守旧值 ${state.tradition}／创新值 ${state.innovation}（0–6，互不联动）`,
-      }),
-    }
-    const text = await withTimeout((signal) => postAiText(url, body, signal))
+    const text = await withTimeout((signal) =>
+      postAiText(url, {
+        prompt: fillPrompt(PROMPT_STANCE_JUDGE, {
+          playerAnswer: answer,
+          storyContext: `守旧值 ${state.tradition}／创新值 ${state.innovation}（0–6，互不联动）`,
+        }),
+        // 判定必须是严格 JSON：让代理带上 response_format: json_object
+        json: true,
+      }, signal)
+    )
     return parseJudge(text)
   } catch {
-    return { tradition: 0, innovation: 0 }
+    // 代理根本没起来（静态托管）→ 用关键词粗判，演示才有区分度；
+    // 代理在但上游失败（Key/模型/超时）→ 按规格一律 0/0，不猜。
+    return proxyState === 'missing' ? mockStanceJudge(answer) : { tradition: 0, innovation: 0 }
   }
 }
 
