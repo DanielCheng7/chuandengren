@@ -4,6 +4,7 @@
  * 屏幕路由：标题页 →（渐隐·黑场）→ 开场 CG → 剧情页 → 结局页
  */
 import { computed, onUnmounted, ref, watch } from 'vue'
+import AiBadge from './components/AiBadge.vue'
 import EndingScreen from './components/EndingScreen.vue'
 import OpeningCg from './components/OpeningCg.vue'
 import OrientationHint from './components/OrientationHint.vue'
@@ -101,6 +102,10 @@ onUnmounted(() => stageTimers.forEach((t) => window.clearTimeout(t)))
     <!-- 竖屏提示（2026-10-22）：只在竖屏出现，可关、不阻断；转横屏自动消失。
          放在最外层，标题页／CG／剧情页／结局页都会盖到。 -->
     <OrientationHint />
+
+    <!-- 「AI辅助生成」角标（2026-10-22）：页面级常驻，z-index 80 压在所有层之上；
+         不吃点击，不参与任何交互。放在 DOM 最末，兜底保证它在最后绘制。 -->
+    <AiBadge />
   </div>
 </template>
 

@@ -83,8 +83,9 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  /* 右侧多留 44px：标题页右上有竖排副标题，别把它压住 */
-  padding: max(10px, env(safe-area-inset-top)) 44px 0 12px;
+  /* 右侧多留 44px：标题页右上有竖排副标题，别把它压住；
+     顶部多留 26px：让开左上角的「AI辅助生成」角标（z-index 低于它，不让就叠在一起） */
+  padding: calc(max(10px, env(safe-area-inset-top)) + 26px) 44px 0 12px;
   pointer-events: none;
 }
 
