@@ -32,6 +32,18 @@ npm run gen:scenes # 重新生成 13 张场景渐变图 grad_<key>.svg
 
 `npm run dev` 已开启局域网访问（`host: true`），手机同一 Wi-Fi 下打开 `http://<本机IP>:5173` 可直接测竖屏。
 
+### 队友上手（clone 后三件事）
+
+1. **Node ≥ 20.19 或 ≥ 22.12**（Vite 8 / rolldown 的硬要求，`package.json` 的 `engines` 已写明）。
+   低版本会在 `npm install` 或启动时直接报错，先升 Node 再装。
+2. **`npm install`**。若卡在 `502` / `ETIMEDOUT`（公司或校园网代理常见），先 `npm config get registry`
+   确认没被改，再 `npm install --prefer-offline` 重试——多半是瞬时网络问题。
+3. **要不要真 AI？** 不配也能完整通关：`/api/ai` 返回 503 后前端**自动退回关键词 mock**
+   （守旧/创新两轴按词表粗判），CG、BGM、存档、结局全部正常。
+   要展示真模型判定，就 `cp .env.example .env.local` 并填 `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL`
+   （Key 私下传，**不要提交**），重启 `npm run dev` 看到 `✅ [ai] …` 即生效。
+
+
 ---
 
 ## 当前进度（V3.0）
