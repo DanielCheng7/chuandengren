@@ -21,6 +21,9 @@ export const c4Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C4｜你的手，往哪里放（结算节点 · 无选项）',
     scene: 'lantern_workshop',
+    // 背景（2026-10-22）：左右分屏——左边竹篾与手（灯坊），右边数位笔与电脑（工作室），
+    // 正好是「两只手搁在两张桌上」这一帧；图里只有手，不涉角色，无需 backdropCast
+    backdrop: 'ch3/C4.webp',
     kind: 'settle',
     lines: [
       stage('【C4】你的手，往哪里放（结算节点 · 无选项、不调 AI）'),

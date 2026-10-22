@@ -9,11 +9,11 @@
  *  - 温吞版只改两句旁白（E1「抉择回响」＋结局旁白），并**去掉末帧双灯彩蛋**；
  *  - 坚定版用现文案（"河跟海，挨着。"），保留末帧彩蛋（数字模型与真灯并列、虚线补齐）。
  *
- * 背景落位（2026-10-21，`public/assets/scenes/ch3/`，图源 `photo/结局/`）：
+ * 背景落位（2026-10-21，`public/assets/scenes/chains/`，图源 `photo/结局/`）：
  *  - 按镜头拆节点，台词逐字未改：E3 →E3-1（孩子围桌／城市幕墙／姑娘扎龙首／展厅指鱼）四帧，
  *    第三帧无台词，按序章的**纯图片镜头**写法（`kind:'montage'` + `holdMs`）停留 1.4s 自动推进。
  *  - 源文件名：`C1.jpg→E1.webp`、`C2.jpg→E2.webp`、`C3-1~4.jpg→E3-1~4.webp`。
- *  - **结局 C 用成片**（2026-10-21 用户决定）：`ch3/结局C.mp4`（30.02s／1280×720／27.8MB／无音轨）
+ *  - **结局 C 用成片**（2026-10-21 用户决定）：`chains/结局C.mp4`（30.02s／1280×720／27.8MB／无音轨）
  *    挂在 `END-C-CG` 的 `cg` 上；END-C 正文仍逐字播完，再接成片，播完进 EP。
  *    END-C 的静态底图取自成片首帧，`cast: []`——画面是实拍真人，不叠立绘。
  */
@@ -39,7 +39,7 @@ export const chainCNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'E1｜不二选一',
     scene: 'lantern_workshop',
-    backdrop: 'ch3/E1.webp',
+    backdrop: 'chains/E1.webp',
     backdropCast: ['九婆', '阿禾', '知遥'],
     lines: [
       stage('【E1】不二选一'),
@@ -65,8 +65,12 @@ export const chainCNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'E2｜骨与鳞',
     scene: 'lantern_workshop',
-    backdrop: 'ch3/E2.webp',
+    backdrop: 'chains/E2.webp',
     backdropCast: ['九婆', '知遥'],
+    // 九婆与知遥已画在底图里；显式只留阿禾与阿鲟——
+    // 若照旧按说话人推断（九婆+阿禾+阿鲟），limitCast 上限 2 会按优先级先给九婆、把阿鲟挤掉，
+    // 于是阿鲟那句台词没有立绘。这里绕过上限，改成「画中两人不上立绘」的等价写法。
+    cast: ['阿禾', '阿鲟'],
     lines: [
       stage('【E2】骨与鳞'),
       stage(
@@ -90,7 +94,7 @@ export const chainCNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'E3-1｜三年后·开坊',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/E3-1.webp',
+    backdrop: 'chains/E3-1.webp',
     backdropCast: ['九婆'],
     lines: [
       stage('【E3】三年后（合流发展）'),
@@ -109,7 +113,7 @@ export const chainCNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'E3-2｜城市幕墙',
     scene: 'city_facade',
-    backdrop: 'ch3/E3-2.webp',
+    backdrop: 'chains/E3-2.webp',
     lines: [
       stage('画面（二）：同一周，城市幕墙的数字鱼点亮，扫二维码跳出"鱼灯作坊"。'),
       nar('游鱼夜没改期。灯还是那些灯——'),
@@ -123,7 +127,7 @@ export const chainCNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'E3-3｜姑娘扎完龙首',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/E3-3.webp',
+    backdrop: 'chains/E3-3.webp',
     kind: 'montage',
     holdMs: 1400,
     lines: [stage('画面（三·上）：第三年，一个姑娘在灯坊扎完龙首。')],
@@ -136,7 +140,7 @@ export const chainCNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'E3-4｜展厅',
     scene: 'city_facade',
-    backdrop: 'ch3/E3-4.webp',
+    backdrop: 'chains/E3-4.webp',
     lines: [
       stage('画面（三·下）：另一个年轻人在展厅指着数字鱼说"这是我家灯坊的灯"。'),
       nar('举灯的手，换了一批年轻的；屏幕里的鱼，也认得回村的水路。'),
@@ -150,7 +154,7 @@ export const chainCNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局C｜灯海相连',
     scene: 'fish_parade',
-    backdrop: 'ch3/END-C.webp',
+    backdrop: 'chains/END-C.webp',
     // 底图取自成片首帧（实拍真人），不叠立绘；名条照常
     cast: [],
     lines: [
@@ -182,7 +186,7 @@ export const chainCNodes: StoryNode[] = [
     sectionTitle: '结局C｜成片',
     scene: 'fish_parade',
     // 30.02s 实拍成片（真人游鱼夜 + 末帧双鱼灯）；播完或跳过 → 尾声 EP
-    cg: { src: 'ch3/结局C.mp4' },
+    cg: { src: 'chains/结局C.mp4' },
     lines: [stage('【结局 C 成片】30.02s：游鱼夜实拍 + 末帧双灯并列。')],
     nextNodeId: 'EP',
   },

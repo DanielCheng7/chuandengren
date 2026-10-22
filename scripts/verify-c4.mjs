@@ -141,6 +141,12 @@ try {
     const out = []
     const t0 = Date.now()
     while (Date.now() - t0 < timeout) {
+      // 节点内插播的成片（结局 C 的 30s 实拍）会挡住推进：点「跳过」再继续
+      if (await ev(`!!document.querySelector('.cg-video')`)) {
+        await ev(`document.querySelector('.cg-skip')?.click()`)
+        await sleep(700)
+        continue
+      }
       const s = await snap()
       if (s?.dbox && !out.includes(s.dbox)) out.push(s.dbox)
       if (s && pred(s)) return out
@@ -281,7 +287,8 @@ try {
   await sleep(500)
   await ev(`document.querySelector('.btn.choice:not([disabled])')?.click()`)
   // C2-X 选预设 C（双）→ 直接进 C3-1
-  await advanceUntil((x) => x.nodeId === 'C2-X' && x.phase === 'input')
+  // 触点① 在 C2-X2（2026-10-21 第二章按镜头拆节点后）
+  await advanceUntil((x) => x.nodeId === 'C2-X2' && x.phase === 'input')
   await clickPreset(2)
   await advanceUntil((x) => x.nodeId === 'C3-4' && x.phase === 'input')
   await clickPreset(2)

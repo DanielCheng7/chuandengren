@@ -1,5 +1,5 @@
 /**
- * 第三章 C3｜灯会前夜（C3-1 → C3-8 → C3-A／C3-B／C3-C）
+ * 第三章 C3｜灯会前夜（C3-1 → C3-8 → C3-A／C3-B／C3-C → C3-R）
  *
  * 文案来源：**《传灯人·游鱼_互动叙事剧本 - 人工修改》r8（2026-10-18）**
  * 与 `思路/最终版剧情/第三章.txt` 逐字一致；画面／声音／舞台提示 → `stage`（仅审核模式显示）。
@@ -10,7 +10,19 @@
  *    自由输入走 AI 双轴判定；四路收束台词仅微差，播完一律进入 C3-5。
  *  - **C3-A／C3-B／C3-C（倾向节点）**：C3-8 播完按 `T>I`／`I>T`／`T=I` **自动进入、不设选项**
  *    （引擎 `nextIf` + `Condition.axisDiff`），三版"点灯"。
- *  - 三个倾向节点之后进入 C3-R（倾向报告，步骤 35 接入 → 当前为断点屏，属预期）。
+ *  - 三个倾向分支之后进入 C3-R（倾向报告）→ C4 结算。
+ *
+ * 背景落位（2026-10-22，`public/assets/scenes/ch3/`，图源 `photo/第三章/`）：
+ *  - **一个节点只能挂一张底图**，所以「点灯」这三段按镜头拆节点，**台词逐字未改**：
+ *      C3-A → C3-A1（火柴推过来，灯未点）→ C3-A2（划三根火柴·点）→ C3-A3（鱼亮·抄四行字）
+ *      C3-B → C3-B1（先掏手机）→ C3-B2（拍三十七秒）→ C3-B3（伸手点灯·没人扶）→ C3-B4（取景框里它亮了）
+ *      C3-C → C3-C1（一手火柴一手手机）→ C3-C2（点了也录了）→ C3-C3（关投影·两只眼睛）→ C3-C4（抄＋敲进电脑）
+ *  - **艺术给的图少于镜头**，按「同一张顶多个节点」处理，不重复存文件：
+ *      `C3-A1.webp` 同时用于 C3-A1／C3-B1／C3-C1（三版"灯未点"起手式，原图三份字节完全相同）；
+ *      `C3-B2/B3/B4.webp` 同时用于 C3-C2／C3-C3／C3-C4（链 B 与链 C 共用，原图同样字节相同）。
+ *      `C3-5-8.webp` 一张覆盖 C3-5～C3-8 ＋ C3-R（阿鲟投影悬在桌上，四人仰望）。
+ *  - **底图把九婆／阿禾／知遥／周经理都画进去了**，全部节点配 `backdropCast`（否则同一人出现两次）；
+ *    本章因此是「整幅 CG 讲故事」，立绘只在阿鲟（C3-A/B/C、C3-R）出现。
  */
 import type { StoryNode } from '@/types/story'
 import { nar, quote, say, stage } from './format'
@@ -20,6 +32,11 @@ const CHAPTER = '第三章·灯会前夜'
 /** C3-A／C3-B／C3-C 的下一站：倾向报告（报告屏 → C4 结算节点） */
 const NEXT = 'C3-R'
 
+/** 榕树下四人同框（C3-1～C3-8）：底图已画入四个角色，全部剔除立绘 */
+const FOUR = ['九婆', '阿禾', '知遥', '周经理']
+/** 人散之后只剩九婆与阿禾（C3-A/B/C）：阿鲟不画在底图里，仍可出立绘 */
+const THREE = ['九婆', '阿禾', '知遥']
+
 export const c3Nodes: StoryNode[] = [
   /* ============ C3-1｜提案 ============ */
   {
@@ -27,6 +44,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-1｜提案',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-1.webp',
+    backdropCast: FOUR,
     lines: [
       stage('【C3-1】提案'),
       stage(
@@ -51,6 +70,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-2｜交锋',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-2.webp',
+    backdropCast: FOUR,
     lines: [
       stage('【C3-2】交锋'),
       stage('画面：banyan_night。九婆不抬头，择完手里最后一根篾。'),
@@ -84,6 +105,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-3｜九婆的话（核心一）',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-3.webp',
+    backdropCast: FOUR,
     lines: [
       stage('【C3-3】九婆的话（核心一）'),
       stage('画面：九婆这才抬头，把一根新篾递给知遥，示意他弯。'),
@@ -104,6 +127,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-4｜你说呢？（触点②·主，不分支）',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-4.webp',
+    backdropCast: FOUR,
     kind: 'stance',
     lines: [
       stage('【C3-4】你说呢？（触点②·主，不可跳过、不分支）'),
@@ -162,6 +187,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-5｜阿鲟的陈述（数据点睛）',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-5-8.webp',
+    backdropCast: FOUR,
     lines: [
       stage('【C3-5】阿鲟的陈述（数据点睛）'),
       stage('画面：阿鲟的小鱼灯纱纸变透、竹骨结构网展开，投在竹架上，像一片光的灯谱。'),
@@ -181,6 +208,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-6｜阿禾的话（核心二）',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-5-8.webp',
+    backdropCast: FOUR,
     lines: [
       stage('【C3-6】阿禾的话（核心二）'),
       stage('画面：阿禾盯着投在竹架上的扫描线，忽然开口。'),
@@ -201,6 +230,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-7｜周经理的转弯（矛盾不脸谱化）',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-5-8.webp',
+    backdropCast: FOUR,
     lines: [
       stage('【C3-7】周经理的转弯（矛盾不脸谱化）'),
       stage('画面：周经理沉默半晌，忽然低声。'),
@@ -219,6 +250,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-8｜共识框架（全剧题眼，阿鲟投在纸上）',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-5-8.webp',
+    backdropCast: FOUR,
     lines: [
       stage('【C3-8】共识框架（全剧题眼，阿鲟投在纸上）'),
       stage('画面：四行字依次亮起，像点灯——投影在竹架上，逐行 1200ms、依次 +400ms。'),
@@ -240,21 +273,24 @@ export const c3Nodes: StoryNode[] = [
     ],
     // 倾向节点「自动进入、不设选项」：T>I → A／I>T → B／T=I → C（覆盖全部取值）
     nextIf: [
-      { when: [{ key: 'axisDiff', gte: 1 }], nodeId: 'C3-A' },
-      { when: [{ key: 'axisDiff', lte: -1 }], nodeId: 'C3-B' },
-      { when: [{ key: 'axisDiff', gte: 0, lte: 0 }], nodeId: 'C3-C' },
+      { when: [{ key: 'axisDiff', gte: 1 }], nodeId: 'C3-A1' },
+      { when: [{ key: 'axisDiff', lte: -1 }], nodeId: 'C3-B1' },
+      { when: [{ key: 'axisDiff', gte: 0, lte: 0 }], nodeId: 'C3-C1' },
     ],
     nextNodeId: NEXT,
   },
 
-  /* ============ C3-A｜守旧倾向｜先把活做扎实 ============ */
+  /* ============ C3-A1｜守旧倾向｜火柴推过来 ============ */
   {
-    id: 'C3-A',
+    id: 'C3-A1',
     chapter: CHAPTER,
-    sectionTitle: 'C3-A｜守旧倾向｜先把活做扎实',
+    sectionTitle: 'C3-A1｜守旧倾向｜灯还没点',
     scene: 'banyan_night',
-    // 「人陆续散了」：周经理与本场无关，只留九婆、阿禾与阿鲟（同场景内离场，需显式覆盖）
-    cast: ['九婆', '阿禾', '阿鲟'],
+    backdrop: 'ch3/C3-A1.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
     lines: [
       stage('【C3-A】守旧倾向｜先把手上的活做扎实（触发：守旧值 ＞ 创新值；自动进入，不设选项）'),
       stage('画面：banyan_night。人陆续散了，矮凳还围着一圈。竹架上那条半成品鳌鱼灯，从头到尾没点过。'),
@@ -263,6 +299,22 @@ export const c3Nodes: StoryNode[] = [
       say('九婆', '灯还没点。'),
       stage('（她把一盒火柴推到桌子中间）'),
       say('九婆', '点了再走。'),
+    ],
+    nextNodeId: 'C3-A2',
+  },
+
+  /* ============ C3-A2｜划三根火柴 ============ */
+  {
+    id: 'C3-A2',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-A2｜守旧倾向｜划三根火柴',
+    scene: 'banyan_night',
+    backdrop: 'ch3/C3-A2.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    lines: [
       nar('我划了三根。第一根让风灭了，第二根烧到手，第三根才凑到灯芯上。'),
       nar('火进去，鱼就亮了。'),
       nar('竹篾的影子在纱纸上浮出来，一圈一圈，像它自己在游。'),
@@ -270,6 +322,22 @@ export const c3Nodes: StoryNode[] = [
       say('九婆', '火要在鱼肚子里走一圈。走不通，就是死火。'),
       stage('（她松开手）'),
       say('九婆', '你这盏，通了。'),
+    ],
+    nextNodeId: 'C3-A3',
+  },
+
+  /* ============ C3-A3｜鱼亮之后·抄四行字 ============ */
+  {
+    id: 'C3-A3',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-A3｜守旧倾向｜鱼亮之后',
+    scene: 'banyan_night',
+    backdrop: 'ch3/C3-A3.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    lines: [
       stage('画面：阿禾关掉投影。屏幕黑下去，真灯的光第一次落在她脸上。'),
       say('阿禾', '原来不插电，它更亮。'),
       stage('画面：九婆把阿鲟投在纸上的那四行字折起来，塞进他口袋。'),
@@ -281,13 +349,17 @@ export const c3Nodes: StoryNode[] = [
     nextNodeId: NEXT,
   },
 
-  /* ============ C3-B｜创新倾向｜先让人看见 ============ */
+  /* ============ C3-B1｜创新倾向｜先掏手机 ============ */
   {
-    id: 'C3-B',
+    id: 'C3-B1',
     chapter: CHAPTER,
-    sectionTitle: 'C3-B｜创新倾向｜先让人看见',
+    sectionTitle: 'C3-B1｜创新倾向｜先掏手机',
     scene: 'banyan_night',
-    cast: ['九婆', '阿禾', '阿鲟'],
+    backdrop: 'ch3/C3-A1.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
     lines: [
       stage('【C3-B】创新倾向｜先让人看见（触发：创新值 ＞ 守旧值；自动进入，不设选项）'),
       stage('画面：banyan_night。人陆续散了。九婆把火柴推到桌子中间。他没接，先掏出手机，架在暖灯边上。'),
@@ -296,12 +368,60 @@ export const c3Nodes: StoryNode[] = [
       say('九婆', '灯还没点。'),
       stage('（停）'),
       say('九婆', '你拍吧。拍完记得点。'),
+    ],
+    nextNodeId: 'C3-B2',
+  },
+
+  /* ============ C3-B2｜拍了三十七秒 ============ */
+  {
+    id: 'C3-B2',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-B2｜创新倾向｜拍了三十七秒',
+    scene: 'banyan_night',
+    backdrop: 'ch3/C3-B2.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    lines: [
       nar('我拍了三十七秒。点灯、火起、鱼亮。'),
       nar('屏幕里，火是从边上一点一点爬进去的；我的眼睛一直盯着取景框。'),
       nar('拍完才发现，我还没正眼看过它。'),
+    ],
+    nextNodeId: 'C3-B3',
+  },
+
+  /* ============ C3-B3｜伸手点灯·没人扶手腕 ============ */
+  {
+    id: 'C3-B3',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-B3｜创新倾向｜没人扶他的手腕',
+    scene: 'banyan_night',
+    backdrop: 'ch3/C3-B3.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    lines: [
       stage('画面：他伸手去点灯。这一次没人扶他的手腕。'),
       nar('火在鱼肚子里走没走通，我不知道。'),
       nar('我只知道取景框里，它亮了。'),
+    ],
+    nextNodeId: 'C3-B4',
+  },
+
+  /* ============ C3-B4｜取景框里它亮了 ============ */
+  {
+    id: 'C3-B4',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-B4｜创新倾向｜取景框里它亮了',
+    scene: 'banyan_night',
+    backdrop: 'ch3/C3-B4.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    lines: [
       stage('画面：阿禾关掉投影。屏幕黑下去，真灯的光落在她脸上。'),
       say('阿禾', '你拍得比看得清楚。'),
       nar('那晚我没抄四行字。'),
@@ -310,13 +430,17 @@ export const c3Nodes: StoryNode[] = [
     nextNodeId: NEXT,
   },
 
-  /* ============ C3-C｜平衡倾向｜两头都伸一只手 ============ */
+  /* ============ C3-C1｜平衡倾向｜一手火柴一手手机 ============ */
   {
-    id: 'C3-C',
+    id: 'C3-C1',
     chapter: CHAPTER,
-    sectionTitle: 'C3-C｜平衡倾向｜两头都伸一只手',
+    sectionTitle: 'C3-C1｜平衡倾向｜一手火柴一手手机',
     scene: 'banyan_night',
-    cast: ['九婆', '阿禾', '阿鲟'],
+    backdrop: 'ch3/C3-A1.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
     lines: [
       stage('【C3-C】平衡倾向｜两头都伸一只手（触发：守旧值 ＝ 创新值；自动进入，不设选项）'),
       stage('画面：banyan_night。人陆续散了。九婆把火柴推过来。他一手接火柴，一手把手机架在暖灯边上。'),
@@ -324,13 +448,61 @@ export const c3Nodes: StoryNode[] = [
       stage('九婆'),
       say('九婆', '灯还没点。'),
       say('九婆', '拍可以。火得你自己点。'),
+    ],
+    nextNodeId: 'C3-C2',
+  },
+
+  /* ============ C3-C2｜点了灯，也录了像 ============ */
+  {
+    id: 'C3-C2',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-C2｜平衡倾向｜点了也录了',
+    scene: 'banyan_night',
+    backdrop: 'ch3/C3-B2.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    lines: [
       nar('我点了灯，也录了像。'),
       nar('火进去、鱼亮起来的那一瞬，我一只眼睛在灯上，一只眼睛在屏幕里。'),
       nar('两只眼睛看见的，不太一样。'),
+    ],
+    nextNodeId: 'C3-C3',
+  },
+
+  /* ============ C3-C3｜关投影 ============ */
+  {
+    id: 'C3-C3',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-C3｜平衡倾向｜两只眼睛',
+    scene: 'banyan_night',
+    backdrop: 'ch3/C3-B3.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    lines: [
       stage('画面：阿禾关掉投影。屏幕黑下去，真灯的光落在她脸上。'),
       say('阿禾', '原来不插电，它更亮。'),
       say('知遥', '那我把插电的也留着。'),
       say('阿禾', '贪心。'),
+    ],
+    nextNodeId: 'C3-C4',
+  },
+
+  /* ============ C3-C4｜抄四遍·再敲进电脑 ============ */
+  {
+    id: 'C3-C4',
+    chapter: CHAPTER,
+    sectionTitle: 'C3-C4｜平衡倾向｜抄完再敲',
+    scene: 'banyan_night',
+    backdrop: 'ch3/C3-B4.webp',
+    backdropCast: THREE,
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    lines: [
       nar('那晚我抄了四遍四行字。'),
       nar('抄完，又把它们一个字一个字敲进了电脑。'),
     ],
@@ -343,6 +515,8 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-R｜倾向报告',
     scene: 'banyan_night',
+    backdrop: 'ch3/C3-5-8.webp',
+    backdropCast: FOUR,
     kind: 'report',
     lines: [
       stage('【C3-R】倾向报告（★AI：模板取句，不调 AI 生成新句）'),
@@ -354,11 +528,15 @@ export const c3Nodes: StoryNode[] = [
       say('阿鲟', '这一路——'),
     ],
     // 报告屏是阿鲟在讲，阿鲟也站台（与九婆、阿禾并排）
-    cast: ['九婆', '阿禾', '阿鲟'],
-    // s1＝触点①（C2-X，可跳过）、s2＝触点②（C3-4，不可跳过）
+    // 四个人全画在底图里了，立绘一律不上：本章按「整幅 CG」讲，阿鲟由名条与 C3-5-8 里的
+    // 蓝色结构投影承担（把他的小鱼灯叠上去会压住九婆，并与桌上那盏真灯撞成两条鱼）
+    cast: [],
+    // s1＝触点①（C2-X2，可跳过）、s2＝触点②（C3-4，不可跳过）
     // 六档句式照录剧本 r8；`{s1}`／`{s2}` 由引擎填玩家原话（见 utils/report.ts）
     report: {
-      stanceNodeIds: ['C2-X', 'C3-4'],
+      // 触点① 的存档记录挂在 **C2-X2**（2026-10-21 第二章按镜头拆节点后）——写成 C2-X 会永远只取到 s2，
+      // 「两次都选同一倾向」被判成「只说过一次」。
+      stanceNodeIds: ['C2-X2', 'C3-4'],
       templates: {
         bothShou: '你说过"先做扎实"。两次。',
         bothXin: '你说过"先被看见"。两次。',

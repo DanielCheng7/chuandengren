@@ -10,8 +10,8 @@
  *   ② C3-4 触点②：phase=input、3 预设、**无「跳过」**、提交按钮文案为「用这句话回答九婆」；
  *   ③ 预设 A → C3-5（不分支）、守 +2／新 0、stances 记录 1 条；
  *   ④ C3-8 共识框架以 quote 行呈现（`.dbox.t-quote`）、四行标题齐全；
- *   ⑤ T>I 时 C3-8 播完**自动进入 C3-A**（不弹选项）；
- *   ⑥ 重开走 B → C3-B（I>T）；重开走 C → C3-C（T=I）；
+ *   ⑤ T>I 时 C3-8 播完**自动进入 C3-A1**（不弹选项）；
+ *   ⑥ 重开走 B → C3-B1（I>T）；重开走 C → C3-C1（T=I）；
  *   ⑦ 自由输入：阿鲟复述 + 报倾向后，九婆接「你说的，我听着了。」；
  *   ⑧ 全程无 console 报错。
  */
@@ -246,27 +246,28 @@ try {
   await shot('03-c3-8-quote')
 
   /* ⑤ 自动进入 C3-A */
-  s = await advanceUntil((x) => x.nodeId === 'C3-A')
+  // 2026-10-22 点灯段按镜头拆节点：C3-A → C3-A1/A2/A3
+  s = await advanceUntil((x) => x.nodeId === 'C3-A1')
   check(
-    '⑤ T>I：C3-8 播完自动进入 C3-A（不弹选项）',
+    '⑤ T>I：C3-8 播完自动进入 C3-A1（不弹选项）',
     !!s && s.choices.length === 0,
     `node=${s?.nodeId} choices=${s?.choices.length}`
   )
   await shot('04-c3-a')
 
   /* ===== 段 2：创新路径（预设 B） → C3-B ===== */
-  s = await runBranch(1, 'C3-B')
+  s = await runBranch(1, 'C3-B1')
   check(
-    '⑥ I>T：预设 B → C3-B（自动·无选项）',
+    '⑥ I>T：预设 B → C3-B1（自动·无选项）',
     !!s && s.choices.length === 0 && s.i === 2 && s.t === 0,
     `node=${s?.nodeId} t/i=${s?.t}/${s?.i}`
   )
   await shot('05-c3-b')
 
   /* ===== 段 3：平衡路径（预设 C） → C3-C ===== */
-  s = await runBranch(2, 'C3-C')
+  s = await runBranch(2, 'C3-C1')
   check(
-    '⑦ T=I：预设 C → C3-C（自动·无选项）',
+    '⑦ T=I：预设 C → C3-C1（自动·无选项）',
     !!s && s.choices.length === 0 && s.t === 1 && s.i === 1,
     `node=${s?.nodeId} t/i=${s?.t}/${s?.i}`
   )
@@ -314,7 +315,8 @@ try {
   await advanceUntil((x) => x.nodeId === 'C2-0' && x.choices.length > 0)
   await sleep(600)
   await ev(`[...document.querySelectorAll('.btn.choice')].find(b => b.textContent.includes('阿禾'))?.click()`)
-  s = await advanceUntil((x) => x.nodeId === 'C2-X' && x.phase === 'input')
+  // 触点① 在 C2-X2（2026-10-21 第二章按镜头拆节点后）
+  s = await advanceUntil((x) => x.nodeId === 'C2-X2' && x.phase === 'input')
   if (s) {
     await ev(`[...document.querySelectorAll('.free-input .preset')][0]?.click()`)
     await sleep(300)
@@ -371,7 +373,7 @@ try {
       };
     })()`)
     if (cur?.tx && !seen.some((x) => x.nm === cur.nm && x.tx === cur.tx)) seen.push(cur)
-    if (cur && ['C3-A', 'C3-B', 'C3-C'].includes(cur.nodeId)) break
+    if (cur && ['C3-A1', 'C3-B1', 'C3-C1', 'C3-A2', 'C3-B4', 'C3-C4'].includes(cur.nodeId)) break
     // 走到 C3-4 触点界面：舞台点击无效，选一个预设继续（本段只验文字/颜色，不看数值）
     if (cur?.phase === 'input') {
       await ev(`[...document.querySelectorAll('.free-input .preset')][0]?.click()`)
@@ -440,7 +442,8 @@ try {
   await advanceUntil((x) => x.nodeId === 'C2-0' && x.choices.length > 0)
   await sleep(600)
   await ev(`[...document.querySelectorAll('.btn.choice')].find(b => b.textContent.includes('阿禾'))?.click()`)
-  s = await advanceUntil((x) => x.nodeId === 'C2-X' && x.phase === 'input')
+  // 触点① 在 C2-X2（2026-10-21 第二章按镜头拆节点后）
+  s = await advanceUntil((x) => x.nodeId === 'C2-X2' && x.phase === 'input')
   if (s) {
     await ev(`[...document.querySelectorAll('.free-input .preset')][0]?.click()`)
     await sleep(400)

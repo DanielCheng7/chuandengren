@@ -7,7 +7,7 @@
  *  - C4 结算后按 `nextByEnding.B` 进入 B1；线性到 END-B-2，播完进尾声 EP；
  *  - B3／结局 B 的数据口径：观展 11 万／进坊 5140／常客 130（2026-10-18 拍板）。
  *
- * 背景落位（2026-10-21，`public/assets/scenes/ch3/`，图源 `photo/结局/`）：
+ * 背景落位（2026-10-21，`public/assets/scenes/chains/`，图源 `photo/结局/`）：
  *  - 按镜头拆节点，台词逐字未改：B2 →B2-1（城市鱼群）→B2-2（末帧·真人点睛的手）／
  *    END-B →END-B-1（同一晚双画面）→END-B-2（数字鱼游出屏幕／真手提灯）。
  *  - 源文件名：`B2-1.png→B2-1.webp`、`结局B-1.png→END-B-1.webp`。
@@ -24,7 +24,7 @@ export const chainBNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'B1｜数字灯谱',
     scene: 'studio_night',
-    backdrop: 'ch3/B1.webp',
+    backdrop: 'chains/B1.webp',
     // 底图里阿禾与知遥都是全身，中间的墨蓝面板就是阿鲟的界面——全帧已完整，不再叠立绘
     cast: [],
     backdropCast: ['阿禾', '知遥'],
@@ -50,7 +50,7 @@ export const chainBNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'B2-1｜鱼游城市',
     scene: 'city_facade',
-    backdrop: 'ch3/B2-1.webp',
+    backdrop: 'chains/B2-1.webp',
     lines: [
       stage('【B2】鱼游城市'),
       nar('开春，阿禾接到省城一个展的邀请。'),
@@ -71,7 +71,7 @@ export const chainBNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'B2-2｜末帧·点睛',
     scene: 'city_facade',
-    backdrop: 'ch3/B2-2.webp',
+    backdrop: 'chains/B2-2.webp',
     backdropCast: ['九婆', '阿禾'],
     lines: [
       stage('画面（末帧特写）：每条数字鱼的"点睛"一帧，其实是一段影像——村中真人提笔点睛的手。'),
@@ -87,7 +87,7 @@ export const chainBNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'B3｜后续（把人请回来）',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/B3.webp',
+    backdrop: 'chains/B3.webp',
     // 周经理本场是电话画外音，不站台；坊里只有阿禾
     cast: ['阿禾'],
     lines: [
@@ -111,7 +111,7 @@ export const chainBNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局B｜鱼入海',
     scene: 'fish_parade',
-    backdrop: 'ch3/END-B-1.webp',
+    backdrop: 'chains/END-B-1.webp',
     // 结局段用整幅双画面讲故事（左城市幕墙／右百鱼夜游），不叠立绘；名条照常
     cast: [],
     lines: [
@@ -134,7 +134,7 @@ export const chainBNodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局B-2｜末帧',
     scene: 'fish_parade',
-    backdrop: 'ch3/END-B-2.webp',
+    backdrop: 'chains/END-B-2.webp',
     lines: [
       stage('画面（末帧）：一条数字鱼游过屏幕边缘，画面切到一只真手提起一盏真灯，光从纱纸里透出来。'),
       nar('新，不是把灯掏空了换件衣裳，'),

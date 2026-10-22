@@ -8,7 +8,7 @@
  *  - 结局 A 的**代价段**按守旧值取一版（T≥4／T=3／T=2），与分层无关；
  *  - 末段播完进尾声 EP（《开发文档》§2.4 速查表）。
  *
- * 背景落位（2026-10-21，`public/assets/scenes/ch3/`，图源 `photo/结局/`）：
+ * 背景落位（2026-10-21，`public/assets/scenes/chains/`，图源 `photo/结局/`）：
  *  - 一个节点只能挂一张底图，剧本「一个节点多个镜头」的地方按镜头拆节点，**台词逐字未改**：
  *    A1 →A1-2（门口挂牌／门内围桌）／A3 →A3-1→A3-2→A3-3（三年后的三帧）／
  *    END-A →END-A-1→END-A-2→END-A-3（三代人的手／窗外光河／末帧鳌鱼灯）。
@@ -28,7 +28,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'A1｜开坊',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/A1.webp',
+    backdrop: 'chains/A1.webp',
     lines: [
       stage('【A1】开坊'),
       stage(
@@ -51,7 +51,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'A1-2｜开坊首日·收工',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/A1-2.webp',
+    backdrop: 'chains/A1-2.webp',
     lines: [
       stage('画面：同场门内——小桌上摊着竹篾与纱纸，几个人围着老木台动手，桌上堆着歪歪扭扭的成品。'),
       stage('九婆（收工，看着满桌歪歪扭扭的灯）'),
@@ -66,7 +66,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'A2｜记谱',
     scene: 'lantern_workshop',
-    backdrop: 'ch3/A2.webp',
+    backdrop: 'chains/A2.webp',
     backdropCast: ['九婆', '知遥'],
     lines: [
       stage('【A2】记谱'),
@@ -87,7 +87,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'A3-1｜三年后·第一年',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/A3-1.webp',
+    backdrop: 'chains/A3-1.webp',
     backdropCast: ['九婆', '知遥'],
     lines: [
       stage('【A3】三年后（后续发展）'),
@@ -106,7 +106,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'A3-2｜第二年',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/A3-2.webp',
+    backdrop: 'chains/A3-2.webp',
     backdropCast: ['九婆', '知遥'],
     lines: [
       stage('画面（三帧之二）：第二年，门口长桌坐满，窗台排满小鱼灯。'),
@@ -121,7 +121,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'A3-3｜第三年',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/A3-3.webp',
+    backdrop: 'chains/A3-3.webp',
     backdropCast: ['九婆'],
     lines: [
       stage('画面（三帧之三）：一个跟学了三年的姑娘独立扎完鳌鱼灯的龙首，九婆把用了几十年的旧篾刀放进她手心。'),
@@ -137,7 +137,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局A｜灯还亮着',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/END-A-1.webp',
+    backdrop: 'chains/END-A-1.webp',
     backdropCast: ['九婆', '知遥'],
     lines: [
       stage('【结局 A】《灯还亮着》'),
@@ -168,7 +168,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局A-2｜窗外光河',
     scene: 'fish_parade',
-    backdrop: 'ch3/END-A-2.webp',
+    backdrop: 'chains/END-A-2.webp',
     lines: [
       stage('画面（二）：从灯坊窗内望出去，游鱼夜的光河漫过巷口。'),
       nar('守，不是把灯锁进柜子，'),
@@ -183,7 +183,7 @@ export const chainANodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: '结局A-3｜末帧',
     scene: 'workshop_next_year',
-    backdrop: 'ch3/END-A-3.webp',
+    backdrop: 'chains/END-A-3.webp',
     lines: [
       stage('画面（末帧）：定格在墙上那条奶奶的鳌鱼灯——它被那位姑娘接完了，点亮着，鳞片金红。'),
       nar('路走得很慢。'),

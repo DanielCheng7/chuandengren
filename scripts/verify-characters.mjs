@@ -294,16 +294,17 @@ try {
 
   /* ===== D. 双人分列（C3-2：九婆 + 阿禾） =====
      2026-10-21 链 A/B/C 背景落位后，E1 的底图已画入九婆／阿禾／知遥（backdropCast 全剔），
-     场上不再有两人，故双人分列改用无背景图的 C3-2。 */
+     双人分列改用**链 C 的 E2**：底图只画了九婆与知遥，节点显式 `cast: ['阿禾','阿鲟']`，
+     于是场上是阿禾（左槽）＋阿鲟（右槽）——全片现在唯一还剩「两人同屏」的节点。 */
   await freshBoot()
-  await jumpTo('C3-1')
-  const duo = await advanceToNode(['C3-2'])
+  await jumpTo('E1')
+  const duo = await advanceToNode(['E2'])
   await sleep(500)
   const duoNow = await probe()
   const noOverlap2 =
     duoNow?.count === 2 && duoNow.rects[0].right <= duoNow.rects[1].x + 8
   check(
-    '⑤ 双人分列不重叠（C3-2 九婆＋阿禾），左槽 -left／右槽 -right',
+    '⑤ 双人分列不重叠（E2 阿禾＋阿鲟），左槽 -left／右槽 -right',
     !!duo &&
       duoNow?.count === 2 &&
       noOverlap2 &&
@@ -311,49 +312,40 @@ try {
       (duoNow.rects[1].src || '').endsWith('-right.webp'),
     duoNow?.rects?.map((r) => `${r.src.split('/').pop()}@${r.x}-${r.right}`).join(' | ') || '无'
   )
-  await shot('03-duo-c3-2')
+  await shot('03-duo-e2')
 
-  /* ===== E. 上限 2 人：C3-2 有 4 个说话人 → 只上优先级最高的九婆＋阿禾 ===== */
+  /* ===== E. 四人同框节点不叠立绘：C3-2（底图已画入四人） =====
+     2026-10-22 第三章背景落位后，全片已没有「四个说话人 → 上限裁到两人」的节点了：
+     这类场景的底图把人物画全，节点用 `cast: []`。上限 2 的规则本身仍由
+     `verify-cast-layout` ①⑤（全 100 点巡检）兜底。 */
   await freshBoot()
   await jumpTo('C3-1')
   const trio = await advanceToNode(['C3-2'])
   await sleep(500)
   const trioNow = await probe()
-  const trioNames = (trioNow?.rects ?? []).map((r) => r.src.split('/').pop())
-  const xs2 = (trioNow?.rects ?? []).map((r) => r.x).sort((a, b) => a - b)
   check(
-    '⑥ 同屏上限 2 人：C3-2（九婆/周经理/阿鲟/阿禾）只上九婆＋阿禾',
-    !!trio &&
-      trioNow?.count === 2 &&
-      trioNames.some((s) => s.includes('jiupo')) &&
-      trioNames.some((s) => s.includes('ahe')) &&
-      !trioNames.some((s) => s.includes('zhou')) &&
-      !trioNames.some((s) => s.includes('ashun')) &&
-      xs2.length === 2 &&
-      xs2[1] - xs2[0] > 200,
-    `2 人 @ x=${xs2.join('/')}｜${trioNames.join(',')}`
+    '⑥ 四人同框节点不叠立绘：C3-2（九婆/周经理/阿禾/阿鲟）场上 0 人，靠底图交代',
+    !!trio && trioNow?.count === 0,
+    `场上 ${trioNow?.count} 人`
   )
-  await shot('04-trio-c3-2')
+  await shot('04-c3-2-cg')
 
-  /* ===== E2. 同场景换节点：cast 稳定不闪人（C3-8 → C3-A） ===== */
+  /* ===== E2. 同场景换节点：第三章 CG 段不叠立绘（C3-8 → C3-A1） =====
+     2026-10-22 第三章背景落位后，C3-8／C3-A 的底图把九婆、阿禾、知遥、周经理都画进去了，
+     节点用 `cast: []` 整段不出立绘 —— 这里守两件事：换节点不抛错、周经理离场不留残影。 */
   await freshBoot()
   await jumpTo('C3-1')
   await advanceToNode(['C3-8'], 120000)
   await sleep(400)
   const beforeLeave = await probe()
-  await advanceToNode(['C3-A'], 60000)
+  await advanceToNode(['C3-A1'], 60000)
   await sleep(400)
   const afterLeave = await probe()
   const castNames = (p) => (p?.rects ?? []).map((r) => r.src.split('/').pop()).sort().join(',')
   check(
-    '⑥-2 换节点跟着说话人走：C3-8 周经理在场 → C3-A 周经理退场、阿禾上场（均 2 人）',
-    beforeLeave?.count === 2 &&
-      afterLeave?.count === 2 &&
-      afterLeave?.nodeId === 'C3-A' &&
-      castNames(beforeLeave).includes('zhou') &&
-      castNames(afterLeave).includes('ahe') &&
-      !castNames(afterLeave).includes('zhou'),
-    `C3-8=${castNames(beforeLeave)} → C3-A=${castNames(afterLeave)}`
+    '⑥-2 第三章 CG 段：C3-8 → C3-A1 均不叠立绘（四人全在底图，周经理离场不留残影）',
+    beforeLeave?.count === 0 && afterLeave?.count === 0 && afterLeave?.nodeId === 'C3-A1',
+    `C3-8=${castNames(beforeLeave) || '0 人'} → C3-A1=${castNames(afterLeave) || '0 人'}`
   )
   await shot('05-leave-c3a')
 
