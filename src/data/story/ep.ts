@@ -22,6 +22,14 @@ export const epNodes: StoryNode[] = [
     id: 'EP',
     chapter: CHAPTER,
     sectionTitle: 'EP｜游鱼夜（三分派通用）',
+    /**
+     * `fish_parade` 原先**没有** `bg_*.webp`，而本节点又没有节点级 `backdrop`，
+     * 实机落到一片渐变底（2026-10-22 复查发现，截图存证 `.verify-shot/audit/EP.png`）。
+     * 已补 `bg_fish_parade.webp`（源 `photo/序章/PRO-6_夜游鱼河.png`，16:9），
+     * 顺带修好结局页 B／C（`EndingScreen` 也走这个 scene）。
+     * 剧本要的是「俯拍全景」，PRO-6 是地面视角——先用同题材的美术兜住，
+     * 若美术后续出俯拍图，同名替换即可，代码零改动。
+     */
     scene: 'fish_parade',
     lines: [
       stage('【EP】游鱼夜（三分派通用）'),

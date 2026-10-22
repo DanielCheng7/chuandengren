@@ -149,6 +149,12 @@ export const c2Nodes: StoryNode[] = [
     scene: 'studio_night',
     backdrop: 'ch2/C2-B3.webp',
     backdropCast: ['知遥'],
+    /**
+     * 屏幕角落那行小字：AI 生图画不出稳定文字（原图角落是空的），
+     * 由 `ProjectionLayer` 合成成"界面读数"（`pos: 'screen-tr'`）。
+     * 不动底图，也不改台词——旁白照旧把那句话念完。
+     */
+    projection: { lines: ['渲染精度 99.2%'], pos: 'screen-tr' },
     lines: [
       stage('画面：手指松开，金线鱼一点点聚回来；镜头压到屏幕角落那行小字。'),
       stage('（屏幕上的鱼一点点聚回来）'),

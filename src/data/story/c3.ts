@@ -20,9 +20,13 @@
  *  - **艺术给的图少于镜头**，按「同一张顶多个节点」处理，不重复存文件：
  *      `C3-A1.webp` 同时用于 C3-A1／C3-B1／C3-C1（三版"灯未点"起手式，原图三份字节完全相同）；
  *      `C3-B2/B3/B4.webp` 同时用于 C3-C2／C3-C3／C3-C4（链 B 与链 C 共用，原图同样字节相同）。
- *      `C3-5-8.webp` 一张覆盖 C3-5～C3-8 ＋ C3-R（阿鲟投影悬在桌上，四人仰望）。
+ *      `C3-5-8.webp` 覆盖 C3-5／C3-6／C3-8（阿鲟投影悬在桌上，四人仰望）。
+ *  - **2026-10-22 背景复查后的三处调整**（原先 C3-5～C3-8＋C3-R 五连共用一张图）：
+ *      C3-7 → `C3-1.webp`（「把方案往回收了收」，方案书回到焦点）；
+ *      C3-8 加 `projection`（四行字由 `ProjectionLayer.vue` 合成，读到哪句亮哪行）；
+ *      C3-R → `C3-3.webp`（人散、灯未点、投影已熄）。
  *  - **底图把九婆／阿禾／知遥／周经理都画进去了**，全部节点配 `backdropCast`（否则同一人出现两次）；
- *    本章因此是「整幅 CG 讲故事」，立绘只在阿鲟（C3-A/B/C、C3-R）出现。
+ *    本章因此是「整幅 CG 讲故事」，立绘一律不上（阿鲟由名条与 C3-5-8 里的蓝色结构投影承担）。
  */
 import type { StoryNode } from '@/types/story'
 import { nar, quote, say, stage } from './format'
@@ -230,7 +234,9 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-7｜周经理的转弯（矛盾不脸谱化）',
     scene: 'banyan_night',
-    backdrop: 'ch3/C3-5-8.webp',
+    // 2026-10-22 复查改图：原与 C3-5 共用 C3-5-8（蓝色鱼骨全息）。本节点是「他把方案往回收了收」，
+    // C3-1 正是方案书推在桌上、周经理站在右侧那一帧——焦点回到方案书，也不与前后节点重图。
+    backdrop: 'ch3/C3-1.webp',
     backdropCast: FOUR,
     lines: [
       stage('【C3-7】周经理的转弯（矛盾不脸谱化）'),
@@ -252,6 +258,15 @@ export const c3Nodes: StoryNode[] = [
     scene: 'banyan_night',
     backdrop: 'ch3/C3-5-8.webp',
     backdropCast: FOUR,
+    /**
+     * 四行字投影（2026-10-22）：底图里没有字也没有竹架，这四行是全剧题眼，
+     * 由 `ProjectionLayer.vue` 合成——读到哪一句，墙上亮哪一行。
+     * 锚点取每行开头几个字（做 startsWith 匹配，见 `StoryNode.projection`）。
+     */
+    projection: {
+      lines: ['一、先定骨，再动鳞。', '二、把灯放对地方。', '三、递手。', '四、慢。'],
+      anchors: ['一、先定骨', '二、把灯放对地方', '三、递手', '四、慢'],
+    },
     lines: [
       stage('【C3-8】共识框架（全剧题眼，阿鲟投在纸上）'),
       stage('画面：四行字依次亮起，像点灯——投影在竹架上，逐行 1200ms、依次 +400ms。'),
@@ -515,7 +530,10 @@ export const c3Nodes: StoryNode[] = [
     chapter: CHAPTER,
     sectionTitle: 'C3-R｜倾向报告',
     scene: 'banyan_night',
-    backdrop: 'ch3/C3-5-8.webp',
+    // 2026-10-22 复查改图：原与 C3-5～C3-8 共用一张「蓝色鱼骨全息还亮着」的图，
+    // 但本节点是「人陆续散了、竹架上那盏灯始终没点」。改挂 C3-3（篾递到一半、桌上无灯、
+    // 投影已熄），与前一段形成对比。
+    backdrop: 'ch3/C3-3.webp',
     backdropCast: FOUR,
     kind: 'report',
     lines: [

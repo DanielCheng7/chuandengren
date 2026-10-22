@@ -19,6 +19,7 @@ import DialogueBox from './DialogueBox.vue'
 import FreeInput from './FreeInput.vue'
 import HistoryPanel from './HistoryPanel.vue'
 import ItemShowcase from './ItemShowcase.vue'
+import ProjectionLayer from './ProjectionLayer.vue'
 import SceneBackdrop from './SceneBackdrop.vue'
 import SceneCard from './SceneCard.vue'
 import SettingsPanel from './SettingsPanel.vue'
@@ -45,6 +46,26 @@ const displayLine = computed<Line | null>(() => {
   if (phase.value === 'lines') return e.currentLine.value
   const list = e.lines.value
   return list[list.length - 1] ?? null
+})
+/**
+ * 投影字叠加层（2026-10-22）：已亮行数按"读到第几句"算——
+ * `anchors` 填台词开头几个字，读到那句就点亮对应那行（见 `ProjectionLayer.vue`）。
+ * 用锚点而不用行号：审核模式下 stage 行会插进来改变下标。
+ */
+const projection = computed(() => e.node.value?.projection ?? null)
+const projectionLit = computed(() => {
+  const p = projection.value
+  if (!p) return 0
+  if (!p.anchors?.length) return p.lines.length
+  const list = e.lines.value
+  const idx = e.lineIndex.value
+  let lit = 0
+  for (const a of p.anchors) {
+    const at = list.findIndex((l) => l.text.startsWith(a))
+    // 锚点找不到（台词改写／整行被过滤）按"已亮"处理：宁可早亮，也不要永远不亮
+    if (at < 0 || at <= idx) lit += 1
+  }
+  return lit
 })
 /**
  * 输入界面配置：普通自由输入 或 判定触点（stance）——统一适配成 FreeInput 所需形状。
@@ -403,6 +424,15 @@ onUnmounted(() => {
       :scheme="schemeScene"
       :blur="showChoices"
       :backdrop="e.node.value?.backdrop"
+    />
+
+    <!-- 投影字（C3-8 四行字）：底图之上、立绘之下。
+         只在节点声明了 `projection` 时出现，其余镜头零成本 -->
+    <ProjectionLayer
+      v-if="projection"
+      :lines="projection.lines"
+      :lit="projectionLit"
+      :pos="projection.pos"
     />
 
     <!-- 人物立绘：**常驻在场**（2026-10-19 按 galgame 惯例重做）——

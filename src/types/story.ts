@@ -355,6 +355,26 @@ export interface StoryNode {
    */
   holdMs?: number
   /**
+   * 底图上的「投影字」叠加层（2026-10-22 新增；`ProjectionLayer.vue` 渲染）。
+   *
+   * 给"剧本要求看得见字、但 AI 生图画不出稳定文字"的镜头用代码合成：
+   * 目前只有 C3-8（全剧题眼·四行字投影在竹架上）在用。
+   *
+   * - `lines`：依次亮起的文字，一项一行。
+   * - `anchors`：与 `lines` 一一对应，填**那句台词的开头几个字**（做 `startsWith` 匹配）。
+   *   引擎按"当前读到第几句"算出已亮的行数，玩家读一句、墙上亮一行；
+   *   不填则进节点即全亮。
+   * - 用锚点而不是行号：`settings.showStageNotes` 会改变可见行下标（审核模式多出 stage 行），
+   *   行号会错位，锚点不会。
+   * - `pos`：`center`（默认，画幅上方"投影/灯谱"）｜`screen-tr`（屏幕右上角界面读数小字，
+   *   如 C2-B3 的「渲染精度 99.2%」）。
+   */
+  projection?: {
+    lines: string[]
+    anchors?: string[]
+    pos?: 'center' | 'screen-tr'
+  }
+  /**
    * 按结局分派下一节点（settle 节点用）：
    * `{ A: 'A1', B: 'B1', C: 'E1' }`——未命中的分支回落 `nextNodeId`。
    */
