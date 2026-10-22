@@ -6,6 +6,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import EndingScreen from './components/EndingScreen.vue'
 import OpeningCg from './components/OpeningCg.vue'
+import OrientationHint from './components/OrientationHint.vue'
 import StoryCg from './components/StoryCg.vue'
 import StoryScreen from './components/StoryScreen.vue'
 import TitleScreen from './components/TitleScreen.vue'
@@ -96,6 +97,10 @@ onUnmounted(() => stageTimers.forEach((t) => window.clearTimeout(t)))
     </Transition>
     <EndingScreen v-if="!showTitle && view === 'ending'" :engine="engine" />
     <StoryScreen v-if="!showTitle && view === 'story'" :engine="engine" />
+
+    <!-- 竖屏提示（2026-10-22）：只在竖屏出现，可关、不阻断；转横屏自动消失。
+         放在最外层，标题页／CG／剧情页／结局页都会盖到。 -->
+    <OrientationHint />
   </div>
 </template>
 
