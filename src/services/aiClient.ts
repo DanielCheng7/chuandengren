@@ -305,10 +305,13 @@ export async function requestStanceJudgement(
       }, signal)
     )
     return parseJudge(text)
-  } catch {
+  } catch (e) {
     // 代理根本没起来（静态托管）→ 用关键词粗判，演示才有区分度；
     // 代理在但上游失败（Key/模型/超时）→ 按规格一律 0/0，不猜。
-    return proxyState === 'missing' ? mockStanceJudge(answer) : { tradition: 0, innovation: 0 }
+    if (proxyState === 'missing') return mockStanceJudge(answer)
+    // 上游真错也要留痕：否则现场看到"判定永远 0/0"却查不出是 Key 还是模型没开通
+    console.warn('[ai] 触点判定失败，按 0/0 记录：', e)
+    return { tradition: 0, innovation: 0 }
   }
 }
 
