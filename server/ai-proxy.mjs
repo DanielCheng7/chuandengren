@@ -2,14 +2,19 @@
  * AI 代理（服务端）：`POST /api/ai` → 上游大模型 `chat/completions`
  *
  * 为什么要这一层（《开发文档》§6.5 / §8.4）：
- *   **Key 不得进前端**。浏览器只能发到一个同源路径，Key 只活在服务端进程的
- *   环境变量里（`app/.env.local`，已被 .gitignore 排除）。
+ *   **Key 不得进前端**。浏览器只能发到一个同源路径，默认 Key 只活在服务端进程的
+ *   环境变量里（`app/.env.local`／`app/.env`，均已 .gitignore 排除）。
+ *
+ * 2026-10-23 起支持**每请求自定义配置**（设置页填的模型/Base URL/Key）：
+ *   入参可带 `auth: { apiKey, baseUrl, model }`——缺项用环境变量补，三项都缺即走默认。
+ *   这样团队各用各的 Key 测，仓库里一个密钥都不用留（项目要公开）。
+ *   ⚠️ 代理**永远不回显、不打日志**客户端传来的 Key（环境变量那条启动日志只打前 8 位）。
  *
  * 协议：按 **OpenAI 兼容** 写死——火山方舟／DeepSeek／通义／智谱／各种中转网关
  * 都是这套 `POST {base}/chat/completions` + `Authorization: Bearer <key>`
- * + `choices[0].message.content`。换服务商只改 `.env.local` 三行，不动代码。
+ * + `choices[0].message.content`。换服务商只改设置页或 `.env.local` 三行，不动代码。
  *
- * 入参（前端 → 本代理）：`{ prompt: string, json?: boolean }`
+ * 入参（前端 → 本代理）：`{ prompt: string, json?: boolean, auth?: object }`
  *   `json: true` 时附带 `response_format: { type: 'json_object' }`（触点判定要严格 JSON）
  * 出参：`{ text: string }`，失败：非 2xx + `{ error, detail }`
  *
@@ -41,6 +46,32 @@ export function readAiConfig(env = process.env) {
      */
     thinking: (env.AI_THINKING || 'disabled').trim(),
   }
+}
+
+/**
+ * 解析前端带来的自定义配置（「设置 → AI 模型」里填的）。
+ *
+ * 返回 `{ error }` 非空 → 这份配置不合用，直接 400（别拿去发请求）；
+ * 返回 `patch: null` → 没带或三项全空，按环境变量走。
+ * **这里只做形状校验，不校验 Key 真假**——Key 对不对由上游说了算（原文会带回前端）。
+ */
+function readClientAuth(payload) {
+  const a = payload && typeof payload === 'object' ? payload.auth : null
+  if (!a || typeof a !== 'object') return { error: '', patch: null }
+  const apiKey = typeof a.apiKey === 'string' ? a.apiKey.trim() : ''
+  const model = typeof a.model === 'string' ? a.model.trim() : ''
+  const baseUrl = typeof a.baseUrl === 'string'
+    ? a.baseUrl.trim().replace(/\/chat\/completions\/?$/i, '').replace(/\/+$/, '')
+    : ''
+  if (!apiKey && !model && !baseUrl) return { error: '', patch: null }
+  if (baseUrl) {
+    if (!/^https?:\/\//i.test(baseUrl)) {
+      return { error: 'API Base URL 必须以 http:// 或 https:// 开头', patch: null }
+    }
+    if (baseUrl.length > 300) return { error: 'API Base URL 过长', patch: null }
+  }
+  if (apiKey.length > 400) return { error: 'API Key 过长', patch: null }
+  return { error: '', patch: { apiKey, model, baseUrl } }
 }
 
 function sendJson(res, status, obj) {
@@ -92,40 +123,81 @@ export async function handleAiRequest(req, res, cfg = readAiConfig()) {
     sendJson(res, 400, { error: 'prompt 为空' })
     return
   }
-  if (!cfg.apiKey || !cfg.model) {
+
+  // 每请求自定义配置：客户端给了哪一项就盖哪一项，没给的仍用服务端默认
+  const { error: authError, patch } = readClientAuth(payload)
+  if (authError) {
+    sendJson(res, 400, { error: '自定义 AI 配置无效', detail: authError })
+    return
+  }
+  const eff = patch
+    ? {
+        ...cfg,
+        apiKey: patch.apiKey || cfg.apiKey,
+        model: patch.model || cfg.model,
+        baseUrl: patch.baseUrl || cfg.baseUrl,
+      }
+    : cfg
+
+  if (!eff.apiKey || !eff.model) {
     // 前端看到这条会退回 mock / 0-0，不会白屏
     sendJson(res, 503, {
       error: 'AI 未配置',
-      detail: '缺少 AI_API_KEY 或 AI_MODEL（见 app/.env.example）',
+      detail: patch
+        ? '自定义配置缺少 API Key 或模型名：到「设置 → AI 模型」补齐'
+        : '缺少 API Key 或模型名：到「设置 → AI 模型」填自己的 Key，或在服务端 app/.env.local 配置（见 .env.example）',
     })
     return
   }
 
   const ac = new AbortController()
-  const timer = setTimeout(() => ac.abort(), cfg.timeoutMs)
+  const timer = setTimeout(() => ac.abort(), eff.timeoutMs)
   try {
-    const r = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [{ role: 'user', content: prompt }],
-        // 判定要稳，不要发挥：温度压低、长度给足（含 JSON 花括号也够）
-        temperature: 0.2,
-        max_tokens: 512,
-        ...(payload.json ? { response_format: { type: 'json_object' } } : {}),
-        // 思考模型默认关掉（见 readAiConfig）；`default` 表示完全不带这个参数
-        ...(cfg.thinking && cfg.thinking !== 'default'
-          ? { thinking: { type: cfg.thinking } }
-          : {}),
-      }),
-      signal: ac.signal,
-    })
+    /**
+     * 发一次上游。`extras=false` 时**只发最小公共字段**（model/messages/temperature/max_tokens）。
+     *
+     * 为什么要分两档：`thinking` 是方舟/豆包系的扩展参数，`response_format` 也不是每家都收。
+     * 团队各用各的模型时，遇到严格校验的网关就会直接 400「unknown field」。
+     * 所以第一次按最优参数发，被拒就退回最小集重试一次——见下面的重试条件。
+     */
+    const attempt = async (extras) => {
+      const r = await fetch(`${eff.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${eff.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: eff.model,
+          messages: [{ role: 'user', content: prompt }],
+          // 判定要稳，不要发挥：温度压低、长度给足（含 JSON 花括号也够）
+          temperature: 0.2,
+          max_tokens: 512,
+          ...(extras && payload.json ? { response_format: { type: 'json_object' } } : {}),
+          // 思考模型默认关掉（见 readAiConfig）；`default` 表示完全不带这个参数
+          ...(extras && eff.thinking && eff.thinking !== 'default'
+            ? { thinking: { type: eff.thinking } }
+            : {}),
+        }),
+        signal: ac.signal,
+      })
+      return { r, raw: await r.text() }
+    }
 
-    const raw = await r.text()
+    let { r, raw } = await attempt(true)
+
+    // 4xx 且报错提到这些扩展字段 → 判定为"网关不认"，剥掉扩展字段重试一次。
+    // 不发情绪：只在 console 记一行，不打扰玩家。
+    const rejectedExtras =
+      !r.ok &&
+      r.status >= 400 &&
+      r.status < 500 &&
+      /thinking|response_format|json_object|unsupported|unrecognized|unknown|invalid|extra/i.test(raw)
+    if (rejectedExtras) {
+      console.info('[ai] 上游疑似不认 thinking / response_format，已去掉扩展字段重试一次')
+      ;({ r, raw } = await attempt(false))
+    }
+
     if (!r.ok) {
       // 把上游原文带回去：Key 错／模型名错／欠费，前台 console 一眼能看出来
       sendJson(res, 502, {
@@ -150,7 +222,7 @@ export async function handleAiRequest(req, res, cfg = readAiConfig()) {
       sendJson(res, 502, {
         error: reasoning ? '上游只返回了思考内容，没有正文' : '上游返回空文本',
         detail: reasoning
-          ? `模型在思考态用满了 max_tokens（${cfg.model}）。设 AI_THINKING=disabled，或调大 max_tokens。`
+          ? `模型在思考态用满了 max_tokens（${eff.model}）。设 AI_THINKING=disabled，或调大 max_tokens。`
           : raw.slice(0, 600),
       })
       return
