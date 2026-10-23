@@ -71,6 +71,10 @@ defineExpose({
   tap() {
     onClick()
   },
+  /** 供父级自动播放判断：这一行是否还没打完（打完才允许自动推进） */
+  isTyping() {
+    return typing.value
+  },
 })
 </script>
 

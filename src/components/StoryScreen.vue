@@ -25,6 +25,7 @@ import SceneCard from './SceneCard.vue'
 import SettingsPanel from './SettingsPanel.vue'
 import Watermark from './Watermark.vue'
 import { useSettings } from '@/composables/useSettings'
+import { typingDurationMs } from '@/composables/useTypewriter'
 import { CHAPTERS, storyNodes } from '@/data/story'
 import { AI_FALLBACK_BUTTON, AI_THINKING_TEXT } from '@/data/fallbackDialogue'
 import { getSceneTint } from '@/data/scenes'
@@ -225,6 +226,9 @@ function clearCardTimer() {
   cardTimer = undefined
 }
 
+/** 对白框实例：自动播放要问它「这一行打完没有」（见 advanceWhenTyped） */
+const dboxRef = ref<InstanceType<typeof DialogueBox> | null>(null)
+
 /** 停留时长按文字长度：1500ms 基础 + 130ms/字，钳制在 2.5–7.5s；序章蒙太奇每屏再 +2s */
 function scheduleCardAdvance() {
   clearCardTimer()
@@ -258,13 +262,26 @@ function scheduleCardAdvance() {
 
   // 普通台词／旁白：仅在「自动播放」开启时推进（字卡与道具原本就走自动节奏，不叠加）
   if (!settings.autoPlay) return
+  // 节点内 CG 播放中：advance() 本来就会拒绝，这里不必排期（播完由 finishCg 续上）
+  if (e.activeCg.value) return
   const chars = Array.from(displayLine.value?.text ?? '').length
-  // 打字机耗时 + 阅读停留（≥1.4s，长句最多 3.2s）——先算打字，避免半行被跳走
-  const typeMs = settings.typewriter ? chars * settings.typewriterSpeed : 0
+  // 打字机耗时 + 阅读停留（≥1.4s，长句最多 3.2s）——先算打字，避免半行被跳走。
+  // 耗时用打字机自己的算法（含标点停顿），不能只按「字数 × 速度」估：
+  // 慢速 + 长句时标点停顿会占掉 1–2 秒，估短了就会在字还没打完时跳下一行。
+  const typeMs = settings.typewriter
+    ? typingDurationMs(displayLine.value?.text ?? '', settings.typewriterSpeed)
+    : 0
   const holdMs = Math.min(3200, Math.max(1400, 1200 + chars * 25))
-  cardTimer = window.setTimeout(() => {
-    if (phase.value === 'lines' && !currentItem.value && !currentSceneCard.value) e.advance()
-  }, typeMs + holdMs)
+  /** 到点再看一眼：万一还在打字（估算与实际有几十毫秒出入），等它打完再走 */
+  function advanceWhenTyped() {
+    if (phase.value !== 'lines' || currentItem.value || currentSceneCard.value) return
+    if (dboxRef.value?.isTyping()) {
+      cardTimer = window.setTimeout(advanceWhenTyped, 160)
+      return
+    }
+    e.advance()
+  }
+  cardTimer = window.setTimeout(advanceWhenTyped, typeMs + holdMs)
 }
 
 // 行 / 节点 / 阶段变化时重排（手动点击推进同样触发，自动取消旧计时）
@@ -276,19 +293,48 @@ watch([phase, () => e.nodeId.value, () => e.lineIndex.value], scheduleCardAdvanc
 watch([() => settings.autoPlay, overlayOpen], scheduleCardAdvance)
 
 /**
- * 选项／自由输入＝必须由玩家决定的一刻：**关闭**自动播放（不是暂停），
- * 选完之后也不恢复——避免玩家离开时替他选掉分支。
+ * 自动播放的「分支点挂起」（2026-10-23 修复）：
+ * 选项／自由输入是必须由玩家决定的一刻，进入时先**暂停**自动播放（不能替他选）；
+ * 玩家做出选择、正文重新开始播放后**自动续上**——
+ * 旧实现在这里把 autoPlay 直接置 false 且永不恢复，玩家只要遇到一次分支，
+ * 「自动」就永久失效，得手动再点一次。
+ *
+ * 只恢复「被挂起的那一次」：挂起期间玩家自己关掉自动，不会被重新打开。
  */
+const autoSuspended = ref(false)
+
 watch(phase, (p) => {
-  if ((p === 'choice' || p === 'input') && settings.autoPlay) settings.autoPlay = false
+  if (p === 'choice' || p === 'input') {
+    if (settings.autoPlay) {
+      autoSuspended.value = true
+      settings.autoPlay = false
+    }
+    return
+  }
+  if (p === 'lines' && autoSuspended.value) {
+    autoSuspended.value = false
+    settings.autoPlay = true // 由 autoPlay 的 watch 重新排期（见上）
+    return
+  }
+  // 走到结局／断点：本次播放结束，挂起标记作废
+  if (p === 'end' || p === 'break') autoSuspended.value = false
 })
+
+/** 重开／回标题＝放弃本次播放：挂起标记一并清掉，别带到下一局 */
+function restartStory() {
+  autoSuspended.value = false
+  e.restart()
+}
+function backToTitle() {
+  autoSuspended.value = false
+  e.goTitle()
+}
 
 /* ---------- 推进与隐藏界面 ---------- */
 /**
  * 统一的"推进"入口：交给 DialogueBox 判断——打字中先补全本行，打完再推进。
  * 舞台点击与 Space/Enter 都走这里，避免"点画面吞掉整行"。
  */
-const dboxRef = ref<InstanceType<typeof DialogueBox> | null>(null)
 function tapOrAdvance() {
   if (dboxRef.value) dboxRef.value.tap()
   else e.advance()
@@ -300,6 +346,18 @@ function onStageClick() {
     return
   }
   if (phase.value === 'lines') tapOrAdvance()
+}
+
+/**
+ * 鼠标点完快捷栏把焦点还给舞台（2026-10-23 修复）：
+ * 按钮点过之后焦点会留在它身上，此时按空格触发的是**那个按钮**（浏览器默认行为），
+ * 而不是推进剧情——点完「自动」再按空格，看起来就像"自动又自己关了"。
+ * `ev.detail === 0` 是键盘（Enter／空格）触发的 click，那种情况保留焦点，别打断 Tab 导航。
+ */
+function releaseFocus(ev: MouseEvent) {
+  if (ev.detail === 0) return
+  const el = ev.target as HTMLElement | null
+  ;(el?.closest('button') as HTMLElement | null)?.blur()
 }
 
 function hideUi() {
@@ -503,7 +561,7 @@ onUnmounted(() => {
 
           <!-- 快捷操作区：固定在对白框右下角（UI 设计书 r3 §4.4）；
                自由输入阶段隐藏（2026-10-16 用户决议），过渡淡出防闪屏 -->
-          <div class="quick-zone" :class="{ 'is-hidden': showFreeInput }" @click.stop>
+          <div class="quick-zone" :class="{ 'is-hidden': showFreeInput }" @click.stop="releaseFocus">
             <!-- 序章蒙太奇：可跳过（不可快进）——《开发文档》§6.3 -->
             <button
               v-if="isMontage"
@@ -530,17 +588,17 @@ onUnmounted(() => {
               :aria-pressed="settings.autoPlay"
               :title="
                 settings.autoPlay
-                  ? '自动播放中：点击关闭（遇选项会自动关闭）'
-                  : '自动逐行推进正文（遇选项自动关闭）'
+                  ? '自动播放中：点击关闭（遇选项暂停，选完继续）'
+                  : '自动逐行推进正文（遇选项暂停，选完继续）'
               "
               @click.stop="settings.autoPlay = !settings.autoPlay"
             >
               自动
             </button>
             <button class="tool touch-44" type="button" @click="showHistory = true">回看</button>
-            <button class="tool touch-44" type="button" @click="e.restart()">重新开始</button>
+            <button class="tool touch-44" type="button" @click="restartStory">重新开始</button>
             <button class="tool touch-44" type="button" @click="showSettings = true">设置</button>
-            <button class="tool touch-44" type="button" @click="e.goTitle()">标题</button>
+            <button class="tool touch-44" type="button" @click="backToTitle">标题</button>
             <button
               class="tool touch-44"
               type="button"
@@ -574,8 +632,8 @@ onUnmounted(() => {
             调试面板（Shift+D）可跳转各章节入口核对剧情。
           </p>
           <div class="break-actions">
-            <button class="btn btn-inline" type="button" @click="e.restart()">从头再玩一遍</button>
-            <button class="btn btn-inline btn-ghost" type="button" @click="e.goTitle()">
+            <button class="btn btn-inline" type="button" @click="restartStory">从头再玩一遍</button>
+            <button class="btn btn-inline btn-ghost" type="button" @click="backToTitle">
               返回标题
             </button>
           </div>

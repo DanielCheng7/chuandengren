@@ -758,6 +758,14 @@ export function useStoryEngine() {
           freeInputDone: freeInputDone.value,
           aiStatus: aiStatus.value,
           journeySummary: journeySummary.value,
+          /**
+           * 正在播的这一组行（BUG 修复 2026-10-23）：
+           * 选项收束台词（stance 的 `close`）、AI 回应、判定失败备用段都是**运行时临时行**，
+           * 只按 nodeId 重建的话一律丢失——刷新后回到本节点开头重播一遍，刚才那段凭空消失
+           * （AI 回应尤其明显）。连同 `pendingNext`（临时行播完要去的节点）一起存。
+           */
+          lines: lines.value,
+          pendingNext: pendingNext.value,
         })
       )
       saveExists.value = true
@@ -780,6 +788,9 @@ export function useStoryEngine() {
         freeInputDone: boolean
         aiStatus: AiStatus
         journeySummary: Line[]
+        /** 存档时正在播的行（旧档没有：回落到按节点重建） */
+        lines?: Line[]
+        pendingNext?: string | null
       }
       if (!data?.nodeId || !getNode(data.nodeId)) return false
       Object.assign(state, createInitialState(), data.state)
@@ -792,7 +803,13 @@ export function useStoryEngine() {
       const n = getNode(data.nodeId)!
       // 旧存档没有 missingNodeId：从当前节点的下一步反推，断点屏才不会显示空节点号
       if (data.phase === 'break' && !missingNodeId.value) missingNodeId.value = n.nextNodeId ?? null
-      lines.value = resolveNodeLines(n)
+      /**
+       * 优先恢复存档里"正在播的那组行"（见 persist 的说明）——重新过一遍行过滤，
+       * 保证本次会话的「演示／审核」开关仍然生效；旧存档或过滤后为空才按节点重建。
+       */
+      const restored = Array.isArray(data.lines) ? filterLines(data.lines) : []
+      lines.value = restored.length ? restored : resolveNodeLines(n)
+      pendingNext.value = restored.length ? (data.pendingNext ?? null) : null
       // 在场人物同样要重建，否则刷新后立绘会空一屏。
       // 只按本节点重建的话，同场景换节点后刷新会"少人"（比如 C3-3 只剩九婆），
       // 所以再并上**同场景最近访问过**的那个节点的说话人，接近连续游玩时的状态。
@@ -827,6 +844,23 @@ export function useStoryEngine() {
       } else {
         phase.value = data.phase
         aiStatus.value = data.aiStatus ?? 'idle'
+      }
+      /**
+       * 死锁兜底（2026-10-23）：存档恢复到「抉择／输入」阶段，但当前条件下那个界面
+       * 一个可交互元素都渲染不出来时，玩家会彻底卡住——
+       * 选项层是 `pointer-events:none`，舞台点击与空格都只在 `lines` 阶段生效，
+       * 界面上不会出现任何可点的东西，只能去点快捷栏的「标题／重开」。
+       * 触发场景：旧档、剧本条件（showIf / c1Order / visitedNodes）改过之后、
+       * 或分章开发中把节点选项删了。这里按"这一屏已经播完"继续推进。
+       */
+      if (phase.value === 'choice' && visibleChoices.value.length === 0) {
+        console.warn(`[save] 存档节点 ${n.id} 处于抉择阶段但没有可选项，自动继续`)
+        phase.value = 'lines'
+        afterLines()
+      } else if (phase.value === 'input' && !n.freeInput && !n.stance) {
+        console.warn(`[save] 存档节点 ${n.id} 处于输入阶段但没有输入配置，自动继续`)
+        phase.value = 'lines'
+        afterLines()
       }
       saveExists.value = true
       return true

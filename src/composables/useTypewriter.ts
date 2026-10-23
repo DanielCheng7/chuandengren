@@ -5,6 +5,17 @@ import { onUnmounted, ref, watch, type Ref } from 'vue'
 
 const PAUSE_CHARS = '，。！？…、；：—”’'
 
+/**
+ * 一行字「打完」需要多久（毫秒）——与 `step()` 同一套节奏，含标点额外停顿。
+ * 自动播放据此排期：只按 `字数 × 速度` 估算会漏掉标点停顿，
+ * 长句（逗号多、速度慢）时计时器会在字还没打完时就推进，把后半句吞掉。
+ */
+export function typingDurationMs(text: string, speed: number): number {
+  let total = 0
+  for (const ch of Array.from(text)) total += speed + (PAUSE_CHARS.includes(ch) ? speed * 6 : 0)
+  return total
+}
+
 export function useTypewriter(
   text: Ref<string | null | undefined>,
   enabled: Ref<boolean>,

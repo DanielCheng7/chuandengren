@@ -22,7 +22,8 @@ export interface Settings {
   volume: number
   /**
    * 自动播放（galgame 的 AUTO）：逐行自动推进正文。
-   * 遇选项／自由输入触点时**自动关闭**，玩家做出选择后也不恢复（防"手离开也替他选"）。
+   * 遇选项／自由输入触点是**临时挂起**（不能替玩家做选择），选完回到正文再自动续上；
+   * 挂起／恢复的判定在 StoryScreen（`autoSuspended`），本文件只存这个播放模式开关。
    */
   autoPlay: boolean
   /** 正文字号缩放（小 0.9 / 标准 1 / 大 1.2，写入全局 --font-scale） */
