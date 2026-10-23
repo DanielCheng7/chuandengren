@@ -327,11 +327,17 @@ check(
     : '上游没收到判定请求'
 )
 // stub 固定回 1/0：等它落到「倾向报告」或状态里，证明链路真的产出了判定
-const judged = await ev(`(() => {
-  const s = JSON.parse(localStorage.getItem('chuandengren.save.v4') || '{}');
-  return { t: s.state?.tradition ?? null, i: s.state?.innovation ?? null,
-           stances: (s.state?.stances || []).length };
-})()`)
+// 判定要等引擎把结果写进存档（上游回包 → 解析 → 落盘），轮询最多 10s
+let judged = null
+for (let i = 0; i < 40; i++) {
+  judged = await ev(`(() => {
+    const s = JSON.parse(localStorage.getItem('chuandengren.save.v4') || '{}');
+    return { t: s.state?.tradition ?? null, i: s.state?.innovation ?? null,
+             stances: (s.state?.stances || []).length };
+  })()`)
+  if (judged && judged.t === 1) break
+  await sleep(250)
+}
 check(
   '⑤-2 判定结果落进存档（stub 回 1/0 → tradition=1）',
   judged && judged.t === 1 && judged.i === 0,

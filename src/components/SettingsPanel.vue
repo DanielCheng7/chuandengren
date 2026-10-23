@@ -459,6 +459,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .row.stacked {
   display: grid;
   gap: 9px;
+  /* 默认 `justify-content: space-between`（继承自 .row）在 grid 下会让自动列按内容宽度收缩，
+     配置列表/表单就只占左半截 —— 这里显式撑满 */
+  justify-content: stretch;
 }
 
 .row-label {
