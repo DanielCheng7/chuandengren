@@ -116,6 +116,8 @@ function logAiConfig(cfg: ReturnType<typeof readAiConfig>) {
       cfg.thinking === 'default' ? '不传' : cfg.thinking
     } ｜ Key ${cfg.apiKey ? `已配置(${cfg.apiKey.slice(0, 8)}…)` : '缺失 → 前端走 mock'}`
   )
+  // 默认值只是兜底：玩家在「设置 → AI 模型」里填的会随请求覆盖这三项（见 server/ai-proxy.mjs）
+  console.log('      [ai] 设置页可覆盖模型 / Base URL / Key（只存本机浏览器，不进 Git）')
 }
 
 // https://vite.dev/config/

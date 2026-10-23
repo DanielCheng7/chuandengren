@@ -6,11 +6,103 @@
  * 下划线分隔、滑杆两端「慢/快」式端点标注、右下「重置 / 返回」。
  * 项目：文字大小（小/标准/大）· 文字显示速度 · 音量；即时生效并经 useSettings 持久化。
  */
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useSettings } from '@/composables/useSettings'
+import {
+  DEFAULT_BASE_URL,
+  maskKey,
+  normalizeBaseUrl,
+  useAiConfig,
+  validateProfile,
+  type AiProfile,
+} from '@/composables/useAiConfig'
+import { probeAiConnection } from '@/services/aiClient'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 const { settings } = useSettings()
+
+/* ---------------- 自定义大模型（2026-10-23） ---------------- */
+const ai = useAiConfig()
+
+const draft = reactive({ id: '', label: '', baseUrl: DEFAULT_BASE_URL, model: '', apiKey: '' })
+/** 表单默认收起：没配过才自动展开（首次进来的队友要看到三栏），配过的人只想切一下 */
+const aiOpen = ref(false)
+const showKey = ref(false)
+const testing = ref(false)
+const aiMsg = ref('')
+const aiMsgOk = ref(false)
+
+/** 当前生效的是哪一套（服务端默认 / 某条自定义） */
+const aiCurrent = computed(() => (ai.active.value ? ai.active.value.label : '服务端默认'))
+
+function say(text: string, ok: boolean) {
+  aiMsg.value = text
+  aiMsgOk.value = ok
+}
+
+function fillDraft(p: AiProfile | null) {
+  draft.id = p?.id ?? ''
+  draft.label = p?.label ?? ''
+  draft.baseUrl = p?.baseUrl ?? DEFAULT_BASE_URL
+  draft.model = p?.model ?? ''
+  draft.apiKey = p?.apiKey ?? ''
+  showKey.value = false
+}
+
+/** 保存并启用：同 id 就地改；新填的则新建一条 */
+function saveAi() {
+  const err = validateProfile(draft)
+  if (err) {
+    say(err, false)
+    return
+  }
+  const saved = ai.save({
+    id: draft.id || undefined,
+    label: draft.label,
+    baseUrl: draft.baseUrl,
+    model: draft.model,
+    apiKey: draft.apiKey,
+  })
+  fillDraft(saved)
+  say(`已保存并启用「${saved.label}」`, true)
+}
+
+/** 切到某条已存配置（顺便把表单换成它，方便接着改） */
+function pickProfile(p: AiProfile) {
+  ai.activate(p.id)
+  fillDraft(p)
+  say(`已切换到「${p.label}」`, true)
+}
+
+function dropProfile(p: AiProfile) {
+  ai.remove(p.id)
+  if (draft.id === p.id) fillDraft(null)
+  say(`已删除「${p.label}」（Key 只在本机，删了就找不回，请自行留存）`, true)
+}
+
+function useServerDefault() {
+  ai.useServerDefault()
+  say('已切回服务端默认配置', true)
+}
+
+/** 测试连接：优先测表单里这套（可以先测再存），表单为空才测当前生效的 */
+async function testAi() {
+  const hasDraft = draft.model.trim() && draft.apiKey.trim()
+  testing.value = true
+  say('正在连接上游…', true)
+  const r = await probeAiConnection(
+    hasDraft
+      ? {
+          apiKey: draft.apiKey.trim(),
+          baseUrl: normalizeBaseUrl(draft.baseUrl),
+          model: draft.model.trim(),
+        }
+      : undefined
+  )
+  testing.value = false
+  if (r.ok) say(`连接成功，上游回：${r.text || '（空）'}`, true)
+  else say(`连接失败：${r.error || '未知错误'}`, false)
+}
 
 const FONT_OPTIONS = [
   { label: '小', value: 0.9 },
@@ -44,7 +136,12 @@ function onKeydown(ev: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
+onMounted(() => {
+  // 打开面板时把当前生效的配置填进表单：改哪条就是哪条，不必先"选中"
+  fillDraft(ai.active.value)
+  aiOpen.value = ai.profiles.length === 0
+  window.addEventListener('keydown', onKeydown)
+})
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
@@ -133,6 +230,126 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <span class="val">{{ settings.volume }}%</span>
             </div>
           </div>
+        </section>
+
+        <!-- 分节：大模型（2026-10-23 用户要求：团队成员各用各的 Key） -->
+        <section class="group">
+          <div class="group-head">
+            <span class="group-name">AI 模型</span>
+            <span class="group-en">MODEL</span>
+          </div>
+
+          <p class="ai-hint">
+            触点判定用这里配的模型。<b>Key 只存在这台设备的浏览器里</b>，不写进代码、不进仓库；
+            没填或点「用服务端默认」时，走服务端配置的模型。
+          </p>
+
+          <div class="row stacked">
+            <span class="row-label">
+              当前使用
+              <span class="row-en">ACTIVE</span>
+            </span>
+            <div class="ai-active">
+              <span class="ai-chip" :class="{ 'is-default': !ai.active.value }">{{ aiCurrent }}</span>
+              <button
+                v-if="ai.active.value"
+                class="mini"
+                type="button"
+                @click="useServerDefault()"
+              >
+                用服务端默认
+              </button>
+              <button class="mini" type="button" @click="aiOpen = !aiOpen">
+                {{ aiOpen ? '收起配置' : '填写 / 修改' }}
+              </button>
+            </div>
+
+            <ul v-if="ai.profiles.length" class="ai-list">
+              <li
+                v-for="p in ai.profiles"
+                :key="p.id"
+                class="ai-item"
+                :class="{ 'is-on': p.id === ai.activeId }"
+              >
+                <button class="ai-pick" type="button" @click="pickProfile(p)">
+                  <span class="ai-name">{{ p.label }}</span>
+                  <span class="ai-meta">{{ p.model }} · {{ maskKey(p.apiKey) }}</span>
+                </button>
+                <button
+                  class="ai-del"
+                  type="button"
+                  :aria-label="`删除配置 ${p.label}`"
+                  @click="dropProfile(p)"
+                >
+                  删
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div v-if="aiOpen" class="ai-form">
+            <label class="field">
+              <span class="field-name">模型名称</span>
+              <input
+                v-model="draft.model"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="如 deepseek-v4-1-flash-economy-261017"
+              />
+            </label>
+            <label class="field">
+              <span class="field-name">API Base URL</span>
+              <input
+                v-model="draft.baseUrl"
+                type="url"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="https://ark.cn-beijing.volces.com/api/v3"
+              />
+            </label>
+            <label class="field">
+              <span class="field-name">API Key</span>
+              <span class="field-row">
+                <input
+                  v-model="draft.apiKey"
+                  :type="showKey ? 'text' : 'password'"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="只保存在本机浏览器"
+                />
+                <button class="mini" type="button" @click="showKey = !showKey">
+                  {{ showKey ? '隐藏' : '显示' }}
+                </button>
+              </span>
+            </label>
+            <label class="field">
+              <span class="field-name">备注名（可选）</span>
+              <input
+                v-model="draft.label"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="留空则用模型名，方便列表里区分"
+              />
+            </label>
+          </div>
+
+          <div v-if="aiOpen" class="ai-actions">
+            <button class="pill is-primary" type="button" @click="saveAi()">
+              保存并启用 <span class="pill-en">SAVE</span>
+            </button>
+            <button class="pill" type="button" :disabled="testing" @click="testAi()">
+              {{ testing ? '连接中…' : '测试连接' }}
+            </button>
+            <button class="pill" type="button" @click="fillDraft(null)">
+              新建
+            </button>
+          </div>
+
+          <p v-if="aiMsg" class="ai-msg" :class="aiMsgOk ? 'is-ok' : 'is-err'" role="status">
+            {{ aiMsg }}
+          </p>
         </section>
       </div>
 
@@ -416,6 +633,222 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   font-size: 11px;
   letter-spacing: 0.2em;
   color: var(--text-faint);
+}
+
+/* ---------- AI 模型分节（2026-10-23） ---------- */
+.ai-hint {
+  margin: 10px 0 2px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.ai-hint b {
+  color: var(--candle);
+  font-weight: 500;
+}
+
+.ai-active {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ai-chip {
+  padding: 3px 12px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--candle);
+  background: rgba(232, 163, 61, 0.12);
+  border: 1px solid rgba(232, 163, 61, 0.38);
+  border-radius: 999px;
+}
+
+.ai-chip.is-default {
+  color: var(--text-dim);
+  background: transparent;
+  border-color: var(--glass-border);
+}
+
+/* 小按钮：显示/隐藏 Key、用服务端默认、删除 */
+.mini {
+  flex: none;
+  min-height: 32px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background: rgba(36, 54, 90, 0.4);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mini:hover {
+    color: var(--paper);
+    border-color: rgba(232, 163, 61, 0.4);
+  }
+}
+
+.ai-list {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  border: 1px solid rgba(245, 239, 226, 0.09);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ai-item.is-on {
+  background: rgba(232, 163, 61, 0.08);
+  border-color: rgba(232, 163, 61, 0.45);
+}
+
+.ai-pick {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  text-align: left;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.ai-name {
+  font-size: 14.5px;
+  color: var(--paper);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-item.is-on .ai-name {
+  color: var(--candle);
+}
+
+.ai-meta {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-del {
+  flex: none;
+  width: 44px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-faint);
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(245, 239, 226, 0.08);
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ai-del:hover {
+    color: #e08a6b;
+  }
+}
+
+.ai-form {
+  display: grid;
+  gap: 10px;
+  padding: 4px 0 2px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.field-name {
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 11px;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--paper);
+  background: rgba(16, 26, 46, 0.55);
+  border: 1px solid var(--glass-border);
+  border-radius: 9px;
+}
+
+.field input::placeholder {
+  color: var(--text-faint);
+}
+
+.field input:focus-visible {
+  outline: 2px solid rgba(232, 163, 61, 0.6);
+  outline-offset: 1px;
+  border-color: rgba(232, 163, 61, 0.4);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 0 2px;
+}
+
+.ai-actions .pill {
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 14.5px;
+}
+
+.ai-actions .pill[disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ai-msg {
+  margin: 8px 0 2px;
+  font-size: 13px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.ai-msg.is-ok {
+  color: #8fbf9f;
+}
+
+.ai-msg.is-err {
+  color: #e08a6b;
 }
 
 @media (pointer: coarse) {

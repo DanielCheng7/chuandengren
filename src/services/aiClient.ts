@@ -15,8 +15,17 @@
  *  - 8 秒超时 → 抛 AiTimeoutError，由调用方落到备用文本（不改剧情、不清进度）。
  */
 import type { GameState, Line } from '@/types/story'
+import { watch } from 'vue'
+import { useAiConfig } from '@/composables/useAiConfig'
 
 const TIMEOUT_MS = 8000
+
+/** 随请求发给同源代理的自定义配置（设置页填写；null＝用服务端默认） */
+export interface AiAuth {
+  apiKey: string
+  baseUrl: string
+  model: string
+}
 
 export type AiSource = 'mock' | 'remote' | 'fallback'
 
@@ -93,6 +102,27 @@ export function fillPrompt(template: string, ctx: Record<string, string>): strin
  */
 let proxyState: 'unknown' | 'ok' | 'missing' = 'unknown'
 
+/**
+ * 设置页换了配置 → 重新给远端一次机会。
+ *
+ * 场景：服务端没配 Key 时第一次请求会 503，被记成 `missing`（本次会话永久走 mock）。
+ * 用户随后在设置页填了自己的 Key，如果不清掉这个标记，填了也照样走 mock——看起来像坏了。
+ */
+const aiConfig = useAiConfig()
+watch(
+  () => aiConfig.activeId,
+  () => {
+    proxyState = 'unknown'
+  }
+)
+
+/** 当前选中的自定义配置 → 请求体里的 `auth`；没选就是 null（交给服务端默认） */
+function currentAuth(): AiAuth | null {
+  const p = aiConfig.active.value
+  if (!p) return null
+  return { apiKey: p.apiKey, baseUrl: p.baseUrl, model: p.model }
+}
+
 function endpoint(): string | undefined {
   // ① 显式配置优先（前端直连别的代理服务时用）
   const explicit = import.meta.env.VITE_AI_ENDPOINT as string | undefined
@@ -132,21 +162,34 @@ function withTimeout<T>(task: (signal: AbortSignal) => Promise<T>, ms = TIMEOUT_
  * 统一的 POST 调用：非 2xx / 空文本均抛错，由调用方落到备用文本。
  * 失败时把代理带回来的 `{error, detail}` 拼进异常消息——控制台一眼能看出
  * 是 Key 格式错、模型名错还是欠费，不必翻服务端日志。
+ *
+ * `auth` 语义（2026-10-23）：
+ *   - `undefined` ＝ 用设置页当前选中的自定义配置（没有就交给服务端默认）；
+ *   - `null`      ＝ 强制用服务端默认（设置页「测试连接」测默认配置时用）；
+ *   - 对象        ＝ 用这份（测试还没保存的草稿）。
  */
 async function postAiText(
   url: string,
   body: { prompt: string; json?: boolean },
-  signal: AbortSignal
+  signal: AbortSignal,
+  auth?: AiAuth | null
 ): Promise<string> {
+  const picked = auth === undefined ? currentAuth() : auth
+  const payload = picked ? { ...body, auth: picked } : body
   const r = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
     signal,
   })
   // 404＝没有挂代理（纯静态托管）；503＝代理在但没配 Key/模型。
   // 两种都算「本次会话没有 AI」，退回 mock，别每个触点再试一次。
-  if ((r.status === 404 || r.status === 503) && !import.meta.env.VITE_AI_ENDPOINT) {
+  // 但**自己带了 Key 的时候不算**：那是配置问题，要让报错露出来，不能悄悄降级。
+  if (
+    (r.status === 404 || r.status === 503) &&
+    !import.meta.env.VITE_AI_ENDPOINT &&
+    !picked
+  ) {
     proxyState = 'missing'
     throw new Error(`AI 代理不可用（${r.status}）→ 改用本地 mock`)
   }
@@ -312,6 +355,40 @@ export async function requestStanceJudgement(
     // 上游真错也要留痕：否则现场看到"判定永远 0/0"却查不出是 Key 还是模型没开通
     console.warn('[ai] 触点判定失败，按 0/0 记录：', e)
     return { tradition: 0, innovation: 0 }
+  }
+}
+
+/* ---------------- 设置页「测试连接」 ---------------- */
+
+export interface AiProbeResult {
+  ok: boolean
+  /** 成功时上游回的原话（截短，只用来判断"通没通"） */
+  text?: string
+  /** 失败原因（沿用代理带回来的 `{error, detail}`） */
+  error?: string
+}
+
+const PROMPT_PING = '只回复两个字：可用。不要标点，不要解释。'
+
+/**
+ * 试打一次上游，用来在设置页验证「模型名 / Base URL / Key」三件套对不对。
+ *
+ * `auth` 语义与 `postAiText` 一致：省略＝当前选中的配置，`null`＝服务端默认，
+ * 对象＝还没保存的草稿（**先测再存**，避免把错的配置写进 localStorage 再删一遍）。
+ * 超时给 15s：比判定用的 8s 宽，够冷启动模型；代理自己在 7s 会回 504。
+ */
+export async function probeAiConnection(auth?: AiAuth | null): Promise<AiProbeResult> {
+  // 不共用 endpoint()：那会在 `missing` 时直接返回 undefined 让人"测不了"，
+  // 而这里恰恰是要探它到底通不通。
+  const url = (import.meta.env.VITE_AI_ENDPOINT as string | undefined) || '/api/ai'
+  try {
+    const text = await withTimeout(
+      (signal) => postAiText(url, { prompt: PROMPT_PING }, signal, auth),
+      15000
+    )
+    return { ok: true, text: text.slice(0, 80) }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 

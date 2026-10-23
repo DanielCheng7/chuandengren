@@ -38,9 +38,11 @@ npm run gen:scenes # 重新生成 13 张场景渐变图 grad_<key>.svg
    低版本会在 `npm install` 或启动时直接报错，先升 Node 再装。
 2. **`npm install`**。若卡在 `502` / `ETIMEDOUT`（公司或校园网代理常见），先 `npm config get registry`
    确认没被改，再 `npm install --prefer-offline` 重试——多半是瞬时网络问题。
-3. **AI 不用配**：仓库里的 `.env` 带了一份团队共用测试 Key，起服务即可用真模型
-   （日志见 `✅ [ai] …`）。要换成自己的 Key / 模型，建 `.env.local` 覆盖即可（不进 Git）。
-   把 `.env.local` 里的 `AI_API_KEY` 留空，就退回关键词 mock——CG、BGM、存档、结局均不受影响。
+3. **AI 用自己的 Key**（2026-10-23 起）：`npm run dev` 后进游戏 →「设置 → AI 模型」，
+   填「模型名称 / API Base URL / API Key」→ 先「测试连接」→ 再「保存并启用」。
+   配置只存在**你这台设备的浏览器**里（localStorage），**不进 Git**；存多套可随时切换，
+   多人共用一台电脑也互不干扰。也可以复制 `.env.example` 为 `.env.local`（已 gitignore）
+   给整台机器配一个默认值。两者都不配 → 自动退回关键词 mock，CG、BGM、存档、结局均不受影响。
 
 
 ---
@@ -161,27 +163,27 @@ app/
 
 ## AI 服务
 
-真 AI **开箱即用**：仓库里的 `.env` 已带一份**团队共用测试 Key**（火山方舟，额度很小，
-够跑流程），clone 下来 `npm run dev` 就能用，日志会打：
+**仓库里不放任何密钥**（项目要公开）。AI 配置有两个入口，都能用：
 
-```
-✅ [ai] 上游 https://ark.cn-beijing.volces.com/api/v3 ｜ 模型 deepseek-v4-1-flash-economy-261017 ｜ 思考 disabled ｜ Key 已配置(ark-e300…)
-```
+| 入口 | 适合谁 | 存在哪 | 进 Git 吗 |
+|---|---|---|---|
+| **设置 → AI 模型**（页面内） | 每个人自己测、随时换模型／换 Key | 本机浏览器 `localStorage` | 否 |
+| `.env.local` | 演示机／整台机器的默认值 | 仓库目录（gitignore） | 否 |
 
-想换自己的 Key / 模型，**不要改 `.env`**，建 `.env.local` 覆盖（优先级更高、且不进 Git）：
+游戏内路径：**设置 → AI 模型** → 填 `模型名称` / `API Base URL` / `API Key` →「测试连接」→「保存并启用」。
+可以存多套（列表里点一下即切换），也可以「用服务端默认」把本地配置让开。
 
-```bash
-# .env.local —— 个人覆盖，已 gitignore
-AI_API_KEY=自己的Key
-AI_MODEL=自己的模型
-```
-
-- **三层优先级**：`.env.local` > `.env`（共用）> 缺省。想停用共用 Key，`.env.local` 里写 `AI_API_KEY=` 空值即可。
-- 代理实现在 `server/ai-proxy.mjs`，`vite.config.ts` 的 `cdr-ai-route` 挂在 `/api/ai`，**Key 只活在服务端进程，不进浏览器、不进构建产物**。
-- 协议按 **OpenAI 兼容**写死（`POST {base}/chat/completions`）：换服务商只改 `AI_BASE_URL`/`AI_MODEL`，代码零改动。
+- **优先级**：设置页选中的那条 > `.env.local` > `.env`（若存在）> 缺省。都没有 → 关键词 mock，仍可完整通关。
+- 代理实现在 `server/ai-proxy.mjs`，`vite.config.ts` 的 `cdr-ai-route` 挂在 `/api/ai`。
+  设置页填的 Key 随请求体（`auth: {apiKey, baseUrl, model}`）发给**同源**代理，由服务端转发；
+  代理不回显、不打日志，前端代码与构建产物里没有任何密钥。
+- 协议按 **OpenAI 兼容**写死（`POST {base}/chat/completions`）：换服务商只改设置页三项（或 `AI_BASE_URL`/`AI_MODEL`），代码零改动。
 - **思考模型默认关思考**（`AI_THINKING=disabled`，可设 `default` 表示不传该参数）——DeepSeek-V4.1、doubao-seed 这类模型会先吐 `reasoning_content`，token 用尽时 `content` 是空的，判定就废了。
-- 前端只发 `{ prompt, json? }`、收回 `{ text }`；`json:true` 时带 `response_format: json_object`（触点判定要严格 JSON）。
-- **降级链**：代理不存在（纯静态托管）或没配 Key → 前端永久退回 mock（关键词粗判，仍可完整通关）；上游真出错 → 一律 `0/0` + 固定回退句，**绝不阻断剧情**；失败原因（含上游原文）透传到 `console.warn`。
-- 纯静态部署：`node --env-file=.env server/ai-proxy.mjs`（默认 8787）单独起代理，再把 `VITE_AI_ENDPOINT` 指过去。
+- 前端只发 `{ prompt, json?, auth? }`、收回 `{ text }`；`json:true` 时带 `response_format: json_object`（触点判定要严格 JSON）。
+- **降级链**：代理不存在（纯静态托管）或没配 Key → 前端永久退回 mock（关键词粗判，仍可完整通关）；上游真出错 → 一律 `0/0` + 固定回退句，**绝不阻断剧情**；失败原因（含上游原文）透传到 `console.warn` 与设置页的「测试连接」结果。
+- 纯静态部署：`node --env-file=.env.local server/ai-proxy.mjs`（默认 8787）单独起代理，再把 `VITE_AI_ENDPOINT` 指过去。
 - `temperature 0.2`、每轴幅度锁 ±1、前端 8s／上游 7s 超时。
-- **Key 纪律**：`.env` 里只放**低额度测试 Key**（额度异常就去方舟控制台吊销，再把新 Key 更新进 `.env`——旧 Key 会留在 git 历史里，所以**正式 Key 永不入库**，只放 `.env.local`）。
+
+> ⚠️ **公开仓库前必做**：2026-10-22 曾把一份测试 Key 提交进 `.env`（commit `172ed42`～`35bfd56`，
+> 已于 2026-10-23 移出版本控制）。**删文件不等于删历史**——公开前请到方舟控制台**吊销那把 Key**，
+> 需要的话再新签一把只放本地 `.env.local` 或设置页。

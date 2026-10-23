@@ -12,15 +12,15 @@ dist
 dist-ssr
 *.local
 
-# 环境变量
-#   ① `.env`   → **进仓库**：团队共用的方舟测试 Key（额度极小、随时可吊销），
-#      队友 clone 下来就能跑真 AI，不用手工配（2026-10-22 团队决定）。
-#   ② `.env.local` / `.env.*.local` → 个人覆盖，永远不进仓库（优先级高于 `.env`）。
-#   ③ 正式/高额度 Key 一律只放 `.env.local`，不要动 `.env`。
+# 环境变量（2026-10-23 起：**任何密钥都不进仓库**）
+#   ① `.env` / `.env.local` / `.env.*` → 全部忽略。Key 要么放本机 `.env.local`，
+#      要么放「设置 → AI 模型」（浏览器 localStorage）——两条都不进 git。
+#   ② `.env.example` 只留空模板，教人怎么填，本身不含任何密钥（唯一例外）。
+#   ③ 历史里曾提交过 `.env`（commit 172ed42～35bfd56）：公开仓库前**必须去方舟
+#      控制台吊销那把 Key**，改代码删文件不等于把历史里的密钥收回来。
+.env
 .env.*
-.env.local
 !.env.example
-!.env
 
 # Local verification output (scripts/verify-headless.mjs)
 .verify*
