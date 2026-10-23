@@ -16,7 +16,9 @@
  *   ③ 「保存并启用」写入 localStorage（key 只在本机），列表出现一项且为启用态；
  *   ④ 刷新整页后配置仍在（不依赖内存）；
  *   ⑤ 触点判定走自定义配置：上游收到 `response_format: json_object` + 自定义 Key；
- *   ⑥ 「用服务端默认」后请求改用服务端 `.env` 里的 Key（不再是自定义那把）。
+ *   ⑥ 「用服务端默认」后请求里不再带自定义 auth（交给服务端配置）。
+ *   ⑦ 严格网关（直接 400「unknown field: thinking」）时，代理剥掉扩展字段重试一次仍成功；
+ *      顺手验证「误粘完整 /chat/completions」不会拼成双路径。
  */
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
@@ -42,6 +44,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /* ---------------- 假上游：记下每次请求 ---------------- */
 const hits = []
+/** 模拟"严格网关"：不认方舟系的 thinking / response_format 扩展字段，直接 400 */
+let strict = false
 const stub = createServer((req, res) => {
   let body = ''
   req.on('data', (c) => (body += c))
@@ -55,8 +59,14 @@ const stub = createServer((req, res) => {
       auth: req.headers.authorization || '',
       model: json.model || '',
       jsonMode: !!json.response_format,
+      thinking: !!json.thinking,
       at: Date.now(),
     })
+    if (strict && (json.thinking || json.response_format)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: { message: 'unknown field: thinking' } }))
+      return
+    }
     const content = json.response_format
       ? '{"tradition": 1, "innovation": 0, "evidence": "stub 判定"}'
       : '可用'
@@ -372,6 +382,8 @@ const PATCH_FETCH = `(() => {
   window.__aiBodies = [];
   const orig = window.fetch;
   window.fetch = function (input, init) {
+    // 后面「严格网关」那项要真打 stub，用这个开关把桩让开，不必重新加载
+    if (window.__aiStubOff) return orig.apply(this, arguments);
     try {
       const url = typeof input === 'string' ? input : (input && input.url) || '';
       if (url.indexOf('/api/ai') >= 0 && init && init.body) {
@@ -418,6 +430,42 @@ check(
   !!last && last.json === true && typeof last.prompt === 'string' && last.prompt.length > 20,
   last ? `json=${last.json} prompt 长度=${last.prompt.length}` : '无请求'
 )
+
+/* ---------- ⑦ 严格网关：不认 thinking / response_format 时自动降级重试 ---------- */
+// 真实场景：团队成员把 Base URL 填成 DeepSeek / 中转网关，对方可能直接 400
+// 「unknown field: thinking」。代理会剥掉扩展字段重试一次，页面应当仍然"连接成功"。
+await ev(`window.__aiStubOff = true`)
+strict = true
+await ev(clickByText('.tool', '设置'))
+for (let i = 0; i < 30; i++) {
+  if (await ev(`!!document.querySelector('.ai-form')`)) break
+  await sleep(200)
+}
+await ev(openAiForm)
+await ev(fillField('模型名称', 'stub-strict-model'))
+await ev(fillField('Base URL', `http://127.0.0.1:${STUB_PORT}/v1/chat/completions`)) // 故意贴完整接口地址
+await ev(fillField('API Key', 'sk-strict-test-000'))
+const before4 = hits.length
+await ev(clickByText('.ai-actions .pill', '测试连接'))
+for (let i = 0; i < 40; i++) {
+  const msg = await ev(`document.querySelector('.ai-msg')?.textContent || ''`)
+  if (/连接成功|连接失败/.test(msg)) break
+  await sleep(250)
+}
+const msg4 = await ev(`document.querySelector('.ai-msg')?.textContent.trim() || ''`)
+const delta = hits.slice(before4)
+const lastStrict = delta[delta.length - 1]
+check(
+  '⑦ 严格网关（拒 thinking）时自动剥扩展字段重试，仍然连接成功',
+  /连接成功/.test(msg4) && delta.length >= 2 && lastStrict?.thinking === false,
+  `提示="${msg4}" 上游命中 ${delta.length} 次，最后一次 thinking=${lastStrict?.thinking}`
+)
+check(
+  '⑦-2 误粘完整 `/chat/completions` 时路径不会拼成双份',
+  lastStrict?.path === '/v1/chat/completions',
+  `实际请求路径=${lastStrict?.path || '（无）'}`
+)
+await shot('05-strict')
 
 await send('Emulation.clearDeviceMetricsOverride')
 ws.close()

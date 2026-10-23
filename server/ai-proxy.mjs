@@ -60,7 +60,9 @@ function readClientAuth(payload) {
   if (!a || typeof a !== 'object') return { error: '', patch: null }
   const apiKey = typeof a.apiKey === 'string' ? a.apiKey.trim() : ''
   const model = typeof a.model === 'string' ? a.model.trim() : ''
-  const baseUrl = typeof a.baseUrl === 'string' ? a.baseUrl.trim().replace(/\/+$/, '') : ''
+  const baseUrl = typeof a.baseUrl === 'string'
+    ? a.baseUrl.trim().replace(/\/chat\/completions\/?$/i, '').replace(/\/+$/, '')
+    : ''
   if (!apiKey && !model && !baseUrl) return { error: '', patch: null }
   if (baseUrl) {
     if (!/^https?:\/\//i.test(baseUrl)) {
@@ -151,28 +153,51 @@ export async function handleAiRequest(req, res, cfg = readAiConfig()) {
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(), eff.timeoutMs)
   try {
-    const r = await fetch(`${eff.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${eff.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: eff.model,
-        messages: [{ role: 'user', content: prompt }],
-        // 判定要稳，不要发挥：温度压低、长度给足（含 JSON 花括号也够）
-        temperature: 0.2,
-        max_tokens: 512,
-        ...(payload.json ? { response_format: { type: 'json_object' } } : {}),
-        // 思考模型默认关掉（见 readAiConfig）；`default` 表示完全不带这个参数
-        ...(eff.thinking && eff.thinking !== 'default'
-          ? { thinking: { type: eff.thinking } }
-          : {}),
-      }),
-      signal: ac.signal,
-    })
+    /**
+     * 发一次上游。`extras=false` 时**只发最小公共字段**（model/messages/temperature/max_tokens）。
+     *
+     * 为什么要分两档：`thinking` 是方舟/豆包系的扩展参数，`response_format` 也不是每家都收。
+     * 团队各用各的模型时，遇到严格校验的网关就会直接 400「unknown field」。
+     * 所以第一次按最优参数发，被拒就退回最小集重试一次——见下面的重试条件。
+     */
+    const attempt = async (extras) => {
+      const r = await fetch(`${eff.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${eff.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: eff.model,
+          messages: [{ role: 'user', content: prompt }],
+          // 判定要稳，不要发挥：温度压低、长度给足（含 JSON 花括号也够）
+          temperature: 0.2,
+          max_tokens: 512,
+          ...(extras && payload.json ? { response_format: { type: 'json_object' } } : {}),
+          // 思考模型默认关掉（见 readAiConfig）；`default` 表示完全不带这个参数
+          ...(extras && eff.thinking && eff.thinking !== 'default'
+            ? { thinking: { type: eff.thinking } }
+            : {}),
+        }),
+        signal: ac.signal,
+      })
+      return { r, raw: await r.text() }
+    }
 
-    const raw = await r.text()
+    let { r, raw } = await attempt(true)
+
+    // 4xx 且报错提到这些扩展字段 → 判定为"网关不认"，剥掉扩展字段重试一次。
+    // 不发情绪：只在 console 记一行，不打扰玩家。
+    const rejectedExtras =
+      !r.ok &&
+      r.status >= 400 &&
+      r.status < 500 &&
+      /thinking|response_format|json_object|unsupported|unrecognized|unknown|invalid|extra/i.test(raw)
+    if (rejectedExtras) {
+      console.info('[ai] 上游疑似不认 thinking / response_format，已去掉扩展字段重试一次')
+      ;({ r, raw } = await attempt(false))
+    }
+
     if (!r.ok) {
       // 把上游原文带回去：Key 错／模型名错／欠费，前台 console 一眼能看出来
       sendJson(res, 502, {

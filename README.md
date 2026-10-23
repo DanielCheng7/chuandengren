@@ -177,7 +177,22 @@ app/
 - 代理实现在 `server/ai-proxy.mjs`，`vite.config.ts` 的 `cdr-ai-route` 挂在 `/api/ai`。
   设置页填的 Key 随请求体（`auth: {apiKey, baseUrl, model}`）发给**同源**代理，由服务端转发；
   代理不回显、不打日志，前端代码与构建产物里没有任何密钥。
-- 协议按 **OpenAI 兼容**写死（`POST {base}/chat/completions`）：换服务商只改设置页三项（或 `AI_BASE_URL`/`AI_MODEL`），代码零改动。
+- 协议按 **OpenAI 兼容**写死（`POST {base}/chat/completions` + `Authorization: Bearer`）：换服务商只改设置页三项（或 `AI_BASE_URL`/`AI_MODEL`），代码零改动。
+
+### 模型兼容性（能填什么）
+
+| 情况 | 举例 | 设置页怎么填 |
+|---|---|---|
+| **可直接用**（OpenAI 兼容 `/chat/completions`） | 火山方舟、DeepSeek、阿里百炼（compatible-mode）、智谱、Moonshot/Kimi、MiniMax、硅基流动、OpenRouter、Groq、Together，以及 one-api / new-api 之类中转 | 填 `…/v1` 形式的 Base URL + 模型名 + Key |
+| **本地模型** | Ollama（`http://127.0.0.1:11434/v1`）、vLLM、LM Studio | 同上；代理允许 `http://` 与本机地址 |
+| **需要兼容层／中转** | Gemini 原生（可用 `…/v1beta/openai`）、Claude（Anthropic 无官方 OpenAI 兼容端点）、百度千帆、腾讯混元原生、**Azure OpenAI**（`api-key` 头 + 部署路径）、AWS Bedrock / Vertex（SigV4 签名） | 前面挂 litellm / one-api 之类，再填中转地址 |
+
+两个已知坑已自动兜底，不用手工处理：
+
+- **严格网关拒 `thinking` / `response_format`**（方舟系扩展字段）→ 代理收到 4xx 且报错提到这些字段时，**自动剥掉扩展字段重试一次**，页面照常「连接成功」。
+- **Base URL 误粘完整接口地址**（`…/v1/chat/completions`）→ 自动剥成 `…/v1`，不会拼成双路径。
+
+注意：判定只给 **7s**（代理，早于前端 8s），慢的思考模型容易 504 → 判 `0/0`；测试建议先点「测试连接」看回包。
 - **思考模型默认关思考**（`AI_THINKING=disabled`，可设 `default` 表示不传该参数）——DeepSeek-V4.1、doubao-seed 这类模型会先吐 `reasoning_content`，token 用尽时 `content` 是空的，判定就废了。
 - 前端只发 `{ prompt, json?, auth? }`、收回 `{ text }`；`json:true` 时带 `response_format: json_object`（触点判定要严格 JSON）。
 - **降级链**：代理不存在（纯静态托管）或没配 Key → 前端永久退回 mock（关键词粗判，仍可完整通关）；上游真出错 → 一律 `0/0` + 固定回退句，**绝不阻断剧情**；失败原因（含上游原文）透传到 `console.warn` 与设置页的「测试连接」结果。

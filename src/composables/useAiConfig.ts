@@ -64,9 +64,14 @@ function load(): Store {
   }
 }
 
-/** 统一收口上游地址：空 → 方舟默认；去掉结尾斜杠（拼 `/chat/completions` 才不会双斜杠） */
+/** 统一收口上游地址：空 → 方舟默认；剥掉误粘的 `/chat/completions` 与结尾斜杠 */
 export function normalizeBaseUrl(url: string): string {
-  const t = (url || '').trim().replace(/\/+$/, '')
+  const t = (url || '')
+    .trim()
+    // 常见误填：把完整接口地址整条贴进来（…/v1/chat/completions）。代理还要再拼一次，
+    // 不剥就会变成 …/chat/completions/chat/completions → 404
+    .replace(/\/chat\/completions\/?$/i, '')
+    .replace(/\/+$/, '')
   return t || DEFAULT_BASE_URL
 }
 
